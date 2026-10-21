@@ -1,0 +1,1186 @@
+[
+ {
+  "title": "Aptitud cognitiva - 1. Razonamiento numérico",
+  "code": "APT1",
+  "minutes": 25,
+  "camera": true,
+  "shuffle": false,
+  "show_score": true,
+  "questions": [
+   {
+    "id": "num1",
+    "type": "mc",
+    "text": "[Numérico] 2, 4, 6, 8, __",
+    "options": [
+     "9",
+     "10",
+     "12",
+     "14"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "num2",
+    "type": "mc",
+    "text": "[Numérico] 5, 10, 20, 40, __",
+    "options": [
+     "50",
+     "60",
+     "80",
+     "100"
+    ],
+    "correct": 2,
+    "points": 1
+   },
+   {
+    "id": "num3",
+    "type": "mc",
+    "text": "[Numérico] 3, 6, 9, 15, 24, __",
+    "options": [
+     "33",
+     "36",
+     "39",
+     "48"
+    ],
+    "correct": 2,
+    "points": 1
+   },
+   {
+    "id": "num4",
+    "type": "mc",
+    "text": "[Numérico] 100, 90, 79, 67, 54, __",
+    "options": [
+     "38",
+     "39",
+     "40",
+     "41"
+    ],
+    "correct": 2,
+    "points": 1
+   },
+   {
+    "id": "num5",
+    "type": "mc",
+    "text": "[Numérico] 1, 4, 9, 16, 25, __",
+    "options": [
+     "30",
+     "36",
+     "42",
+     "49"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "num6",
+    "type": "mc",
+    "text": "[Numérico] 2, 3, 5, 9, 17, __",
+    "options": [
+     "25",
+     "31",
+     "33",
+     "35"
+    ],
+    "correct": 2,
+    "points": 1
+   },
+   {
+    "id": "num7",
+    "type": "mc",
+    "text": "[Numérico] 3/4 + 1/8 =",
+    "options": [
+     "4/12",
+     "7/8",
+     "1",
+     "5/8"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "num8",
+    "type": "mc",
+    "text": "[Numérico] El 15 % de 240 es",
+    "options": [
+     "24",
+     "30",
+     "36",
+     "48"
+    ],
+    "correct": 2,
+    "points": 1
+   },
+   {
+    "id": "num9",
+    "type": "mc",
+    "text": "[Numérico] Si 3x − 7 = 20, entonces x vale",
+    "options": [
+     "7",
+     "8",
+     "9",
+     "10"
+    ],
+    "correct": 2,
+    "points": 1
+   },
+   {
+    "id": "num10",
+    "type": "mc",
+    "text": "[Numérico] 0.6 × 0.5 =",
+    "options": [
+     "0.03",
+     "0.3",
+     "3",
+     "0.11"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "num11",
+    "type": "mc",
+    "text": "[Numérico] (−8) + 5 − (−3) =",
+    "options": [
+     "−6",
+     "0",
+     "6",
+     "−16"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "num12",
+    "type": "mc",
+    "text": "[Numérico] Un libro cuesta Q45 y tiene 20 % de descuento. ¿Cuánto se paga?",
+    "options": [
+     "Q25",
+     "Q36",
+     "Q40",
+     "Q9"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "num13",
+    "type": "mc",
+    "text": "[Numérico] Un bus viaja 3 horas a 80 km/h. ¿Qué distancia recorre?",
+    "options": [
+     "83 km",
+     "160 km",
+     "240 km",
+     "270 km"
+    ],
+    "correct": 2,
+    "points": 1
+   },
+   {
+    "id": "num14",
+    "type": "mc",
+    "text": "[Numérico] En un salón la razón de niños a niñas es 3 : 5 y hay 40 estudiantes. ¿Cuántos niños hay?",
+    "options": [
+     "12",
+     "15",
+     "24",
+     "25"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "num15",
+    "type": "mc",
+    "text": "[Numérico] El perímetro de un rectángulo es 36 cm y su largo es el doble de su ancho. ¿Cuál es su área?",
+    "options": [
+     "48 cm²",
+     "72 cm²",
+     "64 cm²",
+     "108 cm²"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "num16",
+    "type": "mc",
+    "text": "[Numérico] El promedio de cuatro números es 12. Tres de ellos son 10, 12 y 14. ¿Cuál es el cuarto?",
+    "options": [
+     "10",
+     "12",
+     "14",
+     "16"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "num17",
+    "type": "mc",
+    "text": "[Numérico] Cinco obreros terminan una obra en 12 días. ¿En cuántos días la terminarían 10 obreros, trabajando al mismo ritmo?",
+    "options": [
+     "3",
+     "6",
+     "8",
+     "24"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "num18",
+    "type": "mc",
+    "text": "[Numérico] Si 2x + 3y = 12 y x = 3, ¿cuánto vale y?",
+    "options": [
+     "1",
+     "2",
+     "3",
+     "4"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "num19",
+    "type": "mc",
+    "text": "[Numérico] √144 + 3² =",
+    "options": [
+     "15",
+     "21",
+     "27",
+     "156"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "num20",
+    "type": "mc",
+    "text": "[Numérico] Un número aumentado en 20 % da 90. ¿Cuál es el número?",
+    "options": [
+     "70",
+     "72",
+     "75",
+     "108"
+    ],
+    "correct": 2,
+    "points": 1
+   }
+  ]
+ },
+ {
+  "title": "Aptitud cognitiva - 2. Razonamiento verbal",
+  "code": "APT2",
+  "minutes": 20,
+  "camera": true,
+  "shuffle": false,
+  "show_score": true,
+  "questions": [
+   {
+    "id": "ver1",
+    "type": "mc",
+    "text": "[Verbal] RÁPIDO",
+    "options": [
+     "Veloz",
+     "Lento",
+     "Pesado",
+     "Débil"
+    ],
+    "correct": 0,
+    "points": 1
+   },
+   {
+    "id": "ver2",
+    "type": "mc",
+    "text": "[Verbal] ENORME",
+    "options": [
+     "Diminuto",
+     "Colosal",
+     "Frágil",
+     "Tranquilo"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "ver3",
+    "type": "mc",
+    "text": "[Verbal] ESCASO",
+    "options": [
+     "Abundante",
+     "Insuficiente",
+     "Variado",
+     "Costoso"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "ver4",
+    "type": "mc",
+    "text": "[Verbal] EFÍMERO",
+    "options": [
+     "Eterno",
+     "Pasajero",
+     "Hermoso",
+     "Frágil"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "ver5",
+    "type": "mc",
+    "text": "[Verbal] PERSPICAZ",
+    "options": [
+     "Torpe",
+     "Agudo",
+     "Distraído",
+     "Cauteloso"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "ver6",
+    "type": "mc",
+    "text": "[Verbal] GENEROSO",
+    "options": [
+     "Amable",
+     "Tacaño",
+     "Rico",
+     "Alegre"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "ver7",
+    "type": "mc",
+    "text": "[Verbal] ANTIGUO",
+    "options": [
+     "Viejo",
+     "Moderno",
+     "Valioso",
+     "Lejano"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "ver8",
+    "type": "mc",
+    "text": "[Verbal] ESCASEZ",
+    "options": [
+     "Pobreza",
+     "Abundancia",
+     "Falta",
+     "Carencia"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "ver9",
+    "type": "mc",
+    "text": "[Verbal] TENAZ",
+    "options": [
+     "Persistente",
+     "Inconstante",
+     "Fuerte",
+     "Obstinado"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "ver10",
+    "type": "mc",
+    "text": "[Verbal] Pájaro : nido :: abeja : ____",
+    "options": [
+     "miel",
+     "colmena",
+     "flor",
+     "aguijón"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "ver11",
+    "type": "mc",
+    "text": "[Verbal] Médico : hospital :: maestro : ____",
+    "options": [
+     "libro",
+     "escuela",
+     "alumno",
+     "pizarrón"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "ver12",
+    "type": "mc",
+    "text": "[Verbal] Frío : calor :: silencio : ____",
+    "options": [
+     "ruido",
+     "voz",
+     "música",
+     "paz"
+    ],
+    "correct": 0,
+    "points": 1
+   },
+   {
+    "id": "ver13",
+    "type": "mc",
+    "text": "[Verbal] Pluma : escritor :: pincel : ____",
+    "options": [
+     "pintura",
+     "pintor",
+     "lienzo",
+     "museo"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "ver14",
+    "type": "mc",
+    "text": "[Verbal] Semilla : árbol :: huevo : ____",
+    "options": [
+     "gallina",
+     "nido",
+     "cáscara",
+     "yema"
+    ],
+    "correct": 0,
+    "points": 1
+   },
+   {
+    "id": "ver15",
+    "type": "mc",
+    "text": "[Verbal] A pesar de la lluvia, el partido se ______ según lo previsto.",
+    "options": [
+     "canceló",
+     "realizó",
+     "olvidó",
+     "suspendió"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "ver16",
+    "type": "mc",
+    "text": "[Verbal] La directora es muy ______: siempre escucha con atención las opiniones de todos.",
+    "options": [
+     "impaciente",
+     "receptiva",
+     "descortés",
+     "indiferente"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "ver17",
+    "type": "mc",
+    "text": "[Verbal] Como no estudió, el resultado fue ______ a lo que esperaba.",
+    "options": [
+     "idéntico",
+     "similar",
+     "contrario",
+     "acorde"
+    ],
+    "correct": 2,
+    "points": 1
+   },
+   {
+    "id": "ver18",
+    "type": "mc",
+    "text": "[Verbal] Lea el texto: \"La Antigua Guatemala fue la capital de la Capitanía General de Guatemala hasta que los terremotos de 1773 obligaron a trasladar la capital a otro valle. Hoy, sus ruinas coloniales y su arquitectura la convierten en un destino visitado por personas de todo el mundo. En 1979 fue declarada Patrimonio de la Humanidad por la UNESCO.\" — ¿Qué motivó el traslado de la capital?",
+    "options": [
+     "Una guerra",
+     "Los terremotos de 1773",
+     "Una epidemia",
+     "Una erupción volcánica"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "ver19",
+    "type": "mc",
+    "text": "[Verbal] Lea el texto: \"La Antigua Guatemala fue la capital de la Capitanía General de Guatemala hasta que los terremotos de 1773 obligaron a trasladar la capital a otro valle. Hoy, sus ruinas coloniales y su arquitectura la convierten en un destino visitado por personas de todo el mundo. En 1979 fue declarada Patrimonio de la Humanidad por la UNESCO.\" — ¿Cuál es la idea principal del texto?",
+    "options": [
+     "La UNESCO elabora listas de lugares",
+     "La Antigua Guatemala fue capital y hoy conserva un gran valor patrimonial",
+     "Los terremotos son peligrosos",
+     "El turismo es importante en Guatemala"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "ver20",
+    "type": "mc",
+    "text": "[Verbal] Lea el texto: \"La Antigua Guatemala fue la capital de la Capitanía General de Guatemala hasta que los terremotos de 1773 obligaron a trasladar la capital a otro valle. Hoy, sus ruinas coloniales y su arquitectura la convierten en un destino visitado por personas de todo el mundo. En 1979 fue declarada Patrimonio de la Humanidad por la UNESCO.\" — Se puede inferir que La Antigua Guatemala:",
+    "options": [
+     "Perdió todo su valor histórico después de 1773",
+     "Conserva un valor cultural que atrae visitantes",
+     "Dejó de existir",
+     "Fue fundada en 1979"
+    ],
+    "correct": 1,
+    "points": 1
+   }
+  ]
+ },
+ {
+  "title": "Aptitud cognitiva - 3. Razonamiento espacial",
+  "code": "APT3",
+  "minutes": 20,
+  "camera": true,
+  "shuffle": false,
+  "show_score": true,
+  "questions": [
+   {
+    "id": "esp1",
+    "type": "mc",
+    "text": "[Espacial] ¿Cuántas aristas tiene un cubo?",
+    "options": [
+     "6",
+     "8",
+     "12",
+     "24"
+    ],
+    "correct": 2,
+    "points": 1
+   },
+   {
+    "id": "esp2",
+    "type": "mc",
+    "text": "[Espacial] ¿Cuántos vértices tiene un cubo?",
+    "options": [
+     "6",
+     "8",
+     "12",
+     "4"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "esp3",
+    "type": "mc",
+    "text": "[Espacial] Si doblas un cuadrado de papel por una de sus diagonales, la figura que obtienes es un:",
+    "options": [
+     "Rectángulo",
+     "Triángulo",
+     "Círculo",
+     "Pentágono"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "esp4",
+    "type": "mc",
+    "text": "[Espacial] Una flecha que apunta hacia arriba (↑) gira 90° en el sentido de las manecillas del reloj. ¿Hacia dónde apunta ahora?",
+    "options": [
+     "←",
+     "→",
+     "↓",
+     "↑"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "esp5",
+    "type": "mc",
+    "text": "[Espacial] Una flecha que apunta hacia arriba (↑) gira 270° en el sentido de las manecillas del reloj. ¿Hacia dónde apunta ahora?",
+    "options": [
+     "←",
+     "→",
+     "↓",
+     "↑"
+    ],
+    "correct": 0,
+    "points": 1
+   },
+   {
+    "id": "esp6",
+    "type": "mc",
+    "text": "[Espacial] Una torre se forma con 3 capas apiladas, y cada capa es un cuadrado de 3 × 3 cubos. ¿Cuántos cubos tiene la torre?",
+    "options": [
+     "9",
+     "18",
+     "27",
+     "36"
+    ],
+    "correct": 2,
+    "points": 1
+   },
+   {
+    "id": "esp7",
+    "type": "mc",
+    "text": "[Espacial] Una escalera de cubos tiene 4 escalones: el 1.º tiene 1 cubo, el 2.º tiene 2, el 3.º tiene 3 y el 4.º tiene 4 cubos. ¿Cuántos cubos hay en total?",
+    "options": [
+     "8",
+     "10",
+     "12",
+     "16"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "esp8",
+    "type": "mc",
+    "text": "[Espacial] Un cubo de 3 × 3 × 3 se pinta por fuera y luego se corta en 27 cubitos iguales. ¿Cuántos cubitos tienen exactamente 3 caras pintadas?",
+    "options": [
+     "4",
+     "6",
+     "8",
+     "12"
+    ],
+    "correct": 2,
+    "points": 1
+   },
+   {
+    "id": "esp9",
+    "type": "mc",
+    "text": "[Espacial] En el mismo cubo de la pregunta anterior, ¿cuántos cubitos tienen exactamente 1 cara pintada?",
+    "options": [
+     "6",
+     "8",
+     "12",
+     "24"
+    ],
+    "correct": 0,
+    "points": 1
+   },
+   {
+    "id": "esp10",
+    "type": "mc",
+    "text": "[Espacial] En un dado, las caras opuestas suman 7. Si la cara de arriba muestra 2, ¿qué número está en la cara de abajo?",
+    "options": [
+     "3",
+     "4",
+     "5",
+     "6"
+    ],
+    "correct": 2,
+    "points": 1
+   },
+   {
+    "id": "esp11",
+    "type": "mc",
+    "text": "[Espacial] Se dobla una hoja por la mitad una sola vez y se le hace un agujero que no toca el doblez. Al abrirla, ¿cuántos agujeros tiene?",
+    "options": [
+     "1",
+     "2",
+     "3",
+     "4"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "esp12",
+    "type": "mc",
+    "text": "[Espacial] Se dobla una hoja por la mitad y otra vez por la mitad (queda en cuartos). Se hace un agujero en un punto que no toca ningún doblez. Al abrirla, ¿cuántos agujeros tiene?",
+    "options": [
+     "2",
+     "3",
+     "4",
+     "8"
+    ],
+    "correct": 2,
+    "points": 1
+   },
+   {
+    "id": "esp13",
+    "type": "mc",
+    "text": "[Espacial] Un cilindro (como una lata), visto directamente desde arriba, se observa como un:",
+    "options": [
+     "Rectángulo",
+     "Triángulo",
+     "Círculo",
+     "Cuadrado"
+    ],
+    "correct": 2,
+    "points": 1
+   },
+   {
+    "id": "esp14",
+    "type": "mc",
+    "text": "[Espacial] Se coloca un espejo vertical a la derecha de la letra \"b\". ¿Cómo se ve su reflejo?",
+    "options": [
+     "d",
+     "p",
+     "q",
+     "b"
+    ],
+    "correct": 0,
+    "points": 1
+   },
+   {
+    "id": "esp15",
+    "type": "mc",
+    "text": "[Espacial] Caminas 3 pasos al norte, luego 2 pasos al este y luego 3 pasos al sur. ¿Dónde estás respecto al punto de partida?",
+    "options": [
+     "2 pasos al este",
+     "2 pasos al oeste",
+     "3 pasos al norte",
+     "En el mismo punto"
+    ],
+    "correct": 0,
+    "points": 1
+   },
+   {
+    "id": "esp16",
+    "type": "mc",
+    "text": "[Espacial] Continúe la serie: ■ ▲ ● ■ ▲ ● ■ ▲ ?",
+    "options": [
+     "■",
+     "▲",
+     "●",
+     "◆"
+    ],
+    "correct": 2,
+    "points": 1
+   },
+   {
+    "id": "esp17",
+    "type": "mc",
+    "text": "[Espacial] ¿Cuál figura NO pertenece al grupo?",
+    "options": [
+     "Cuadrado",
+     "Triángulo",
+     "Cubo",
+     "Círculo"
+    ],
+    "correct": 2,
+    "points": 1
+   },
+   {
+    "id": "esp18",
+    "type": "mc",
+    "text": "[Espacial] ¿Cuál de estos desarrollos planos puede doblarse para formar un cubo?",
+    "options": [
+     "Seis cuadrados en una sola fila",
+     "Una cruz: 4 cuadrados en columna y un cuadrado pegado a cada lado del segundo",
+     "Dos filas de 3 cuadrados",
+     "Una cruz de solo 5 cuadrados"
+    ],
+    "correct": 1,
+    "points": 1
+   }
+  ]
+ },
+ {
+  "title": "Aptitud cognitiva - 4. Habilidad mental general",
+  "code": "APT4",
+  "minutes": 20,
+  "camera": true,
+  "shuffle": false,
+  "show_score": true,
+  "questions": [
+   {
+    "id": "otis1",
+    "type": "mc",
+    "text": "[Otis] Lo contrario de ALEGRE es",
+    "options": [
+     "Contento",
+     "Triste",
+     "Rápido",
+     "Fuerte"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "otis2",
+    "type": "mc",
+    "text": "[Otis] ¿Cuál palabra NO pertenece al grupo?",
+    "options": [
+     "Rojo",
+     "Azul",
+     "Mesa",
+     "Verde"
+    ],
+    "correct": 2,
+    "points": 1
+   },
+   {
+    "id": "otis3",
+    "type": "mc",
+    "text": "[Otis] 7, 14, 21, 28, __",
+    "options": [
+     "32",
+     "35",
+     "42",
+     "49"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "otis4",
+    "type": "mc",
+    "text": "[Otis] Si 4 lápices cuestan Q8, ¿cuánto cuestan 7 lápices?",
+    "options": [
+     "Q12",
+     "Q14",
+     "Q16",
+     "Q28"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "otis5",
+    "type": "mc",
+    "text": "[Otis] \"Más vale pájaro en mano que ciento volando\" significa:",
+    "options": [
+     "Cazar aves es difícil",
+     "Es mejor lo seguro que lo incierto",
+     "Los pájaros vuelan alto",
+     "Hay que ser veloz"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "otis6",
+    "type": "mc",
+    "text": "[Otis] Zapato : pie :: guante : ____",
+    "options": [
+     "Mano",
+     "Dedo",
+     "Invierno",
+     "Brazo"
+    ],
+    "correct": 0,
+    "points": 1
+   },
+   {
+    "id": "otis7",
+    "type": "mc",
+    "text": "[Otis] Ana es mayor que Beto. Beto es mayor que Carlos. ¿Quién es el menor?",
+    "options": [
+     "Ana",
+     "Beto",
+     "Carlos",
+     "No se sabe"
+    ],
+    "correct": 2,
+    "points": 1
+   },
+   {
+    "id": "otis8",
+    "type": "mc",
+    "text": "[Otis] ¿Cuál es el número mayor?",
+    "options": [
+     "0.5",
+     "0.45",
+     "0.056",
+     "0.9"
+    ],
+    "correct": 3,
+    "points": 1
+   },
+   {
+    "id": "otis9",
+    "type": "mc",
+    "text": "[Otis] Sinónimo de VALIENTE",
+    "options": [
+     "Cobarde",
+     "Audaz",
+     "Callado",
+     "Cansado"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "otis10",
+    "type": "mc",
+    "text": "[Otis] Todos los gatos son animales. Michi es un gato. Entonces:",
+    "options": [
+     "Michi es un animal",
+     "Michi no es un animal",
+     "Todos los animales son gatos",
+     "Michi es un perro"
+    ],
+    "correct": 0,
+    "points": 1
+   },
+   {
+    "id": "otis11",
+    "type": "mc",
+    "text": "[Otis] A, C, E, G, __",
+    "options": [
+     "H",
+     "I",
+     "J",
+     "K"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "otis12",
+    "type": "mc",
+    "text": "[Otis] 81, 27, 9, 3, __",
+    "options": [
+     "0",
+     "1",
+     "2",
+     "6"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "otis13",
+    "type": "mc",
+    "text": "[Otis] Cuando un reloj marca las 3:00 en punto, ¿qué ángulo forman las manecillas?",
+    "options": [
+     "45°",
+     "60°",
+     "90°",
+     "180°"
+    ],
+    "correct": 2,
+    "points": 1
+   },
+   {
+    "id": "otis14",
+    "type": "mc",
+    "text": "[Otis] Compré 3 cuadernos a Q12 cada uno y pagué con un billete de Q50. ¿Cuánto me devolvieron?",
+    "options": [
+     "Q12",
+     "Q14",
+     "Q16",
+     "Q36"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "otis15",
+    "type": "mc",
+    "text": "[Otis] Capítulo : libro :: estrofa : ____",
+    "options": [
+     "Verso",
+     "Poema",
+     "Rima",
+     "Autor"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "otis16",
+    "type": "mc",
+    "text": "[Otis] ¿En qué se parecen una naranja y una manzana?",
+    "options": [
+     "En el color",
+     "Son frutas",
+     "En el tamaño",
+     "En el sabor"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "otis17",
+    "type": "mc",
+    "text": "[Otis] Si hoy es miércoles, ¿qué día será dentro de 10 días?",
+    "options": [
+     "Viernes",
+     "Sábado",
+     "Domingo",
+     "Lunes"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "otis18",
+    "type": "mc",
+    "text": "[Otis] 1, 1, 2, 3, 5, 8, __",
+    "options": [
+     "11",
+     "12",
+     "13",
+     "14"
+    ],
+    "correct": 2,
+    "points": 1
+   },
+   {
+    "id": "otis19",
+    "type": "mc",
+    "text": "[Otis] ¿Cuál fracción es la mayor?",
+    "options": [
+     "2/3",
+     "3/5",
+     "5/8",
+     "7/12"
+    ],
+    "correct": 0,
+    "points": 1
+   },
+   {
+    "id": "otis20",
+    "type": "mc",
+    "text": "[Otis] ELOCUENTE significa:",
+    "options": [
+     "Que se expresa con facilidad y fuerza",
+     "Silencioso",
+     "Enojado",
+     "Veloz"
+    ],
+    "correct": 0,
+    "points": 1
+   },
+   {
+    "id": "otis21",
+    "type": "mc",
+    "text": "[Otis] \"Camarón que se duerme se lo lleva la corriente\" enseña que:",
+    "options": [
+     "Hay que estar atento y no descuidarse",
+     "Los camarones nadan",
+     "Dormir es bueno",
+     "Los ríos son peligrosos"
+    ],
+    "correct": 0,
+    "points": 1
+   },
+   {
+    "id": "otis22",
+    "type": "mc",
+    "text": "[Otis] Ningún pez es mamífero. La ballena es un mamífero. Entonces:",
+    "options": [
+     "La ballena es un pez",
+     "La ballena no es un pez",
+     "Algunos peces son mamíferos",
+     "No se puede saber"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "otis23",
+    "type": "mc",
+    "text": "[Otis] Si x + 5 = 2x − 3, entonces x =",
+    "options": [
+     "2",
+     "6",
+     "8",
+     "10"
+    ],
+    "correct": 2,
+    "points": 1
+   },
+   {
+    "id": "otis24",
+    "type": "mc",
+    "text": "[Otis] Un grifo llena un tanque en 6 horas. ¿Qué parte del tanque llena en 2 horas?",
+    "options": [
+     "1/6",
+     "1/3",
+     "1/2",
+     "2/3"
+    ],
+    "correct": 1,
+    "points": 1
+   },
+   {
+    "id": "otis25",
+    "type": "mc",
+    "text": "[Otis] 2, 6, 12, 20, 30, __",
+    "options": [
+     "36",
+     "40",
+     "42",
+     "48"
+    ],
+    "correct": 2,
+    "points": 1
+   },
+   {
+    "id": "otis26",
+    "type": "mc",
+    "text": "[Otis] ¿Cuál NO pertenece al grupo?",
+    "options": [
+     "Violín",
+     "Guitarra",
+     "Tambor",
+     "Arpa"
+    ],
+    "correct": 2,
+    "points": 1
+   },
+   {
+    "id": "otis27",
+    "type": "mc",
+    "text": "[Otis] El 40 % de un grupo de 50 estudiantes son mujeres. ¿Cuántos son hombres?",
+    "options": [
+     "20",
+     "25",
+     "30",
+     "40"
+    ],
+    "correct": 2,
+    "points": 1
+   },
+   {
+    "id": "otis28",
+    "type": "mc",
+    "text": "[Otis] Si giras la letra N un cuarto de vuelta (90°), se parece a la letra:",
+    "options": [
+     "Z",
+     "M",
+     "W",
+     "S"
+    ],
+    "correct": 0,
+    "points": 1
+   },
+   {
+    "id": "otis29",
+    "type": "mc",
+    "text": "[Otis] Pedro tiene el doble de la edad de Luis. Juntos suman 36 años. ¿Cuántos años tiene Pedro?",
+    "options": [
+     "12",
+     "18",
+     "24",
+     "30"
+    ],
+    "correct": 2,
+    "points": 1
+   },
+   {
+    "id": "otis30",
+    "type": "mc",
+    "text": "[Otis] \"Sin esfuerzo no hay ______.\"",
+    "options": [
+     "Descanso",
+     "Logros",
+     "Dinero",
+     "Tiempo"
+    ],
+    "correct": 1,
+    "points": 1
+   }
+  ]
+ }
+]

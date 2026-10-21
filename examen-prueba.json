@@ -1,0 +1,16 @@
+{
+ "title": "Examen de prueba - Cultura general",
+ "code": "PRUEBA1",
+ "minutes": 10,
+ "camera": true,
+ "shuffle": true,
+ "show_score": true,
+ "questions": [
+  { "id": "q1", "type": "mc", "text": "¿Cuál es la capital de Guatemala?", "options": ["Antigua Guatemala", "Ciudad de Guatemala", "Quetzaltenango", "Escuintla"], "correct": 1, "points": 1 },
+  { "id": "q2", "type": "mc", "text": "¿Cuánto es 7 x 8?", "options": ["54", "56", "58", "64"], "correct": 1, "points": 1 },
+  { "id": "q3", "type": "mc", "text": "¿Qué planeta es conocido como el planeta rojo?", "options": ["Venus", "Júpiter", "Marte", "Saturno"], "correct": 2, "points": 1 },
+  { "id": "q4", "type": "mc", "text": "¿Cuántos días tiene un año bisiesto?", "options": ["365", "366", "364", "367"], "correct": 1, "points": 1 },
+  { "id": "q5", "type": "text", "text": "¿Cuál es el océano más grande del mundo?", "answers": ["Pacífico", "Océano Pacífico", "Pacifico"], "points": 2 },
+  { "id": "q6", "type": "text", "text": "¿Cuál es el resultado de 15 + 27?", "answers": ["42"], "points": 2 }
+ ]
+}
