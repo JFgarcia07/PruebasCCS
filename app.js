@@ -21,10 +21,11 @@ const LEVELS = [
   { min: 35, range: '35 % a 49 %', name: 'Bajo el promedio', cls: 'warn', text: 'El estudiante muestra un desempeño inferior al promedio establecido en las habilidades evaluadas. Puede presentar dificultades en tareas que requieren comprensión, razonamiento, identificación de patrones o resolución de problemas, por lo que conviene identificar sus necesidades de apoyo académico.' },
   { min: 0, range: 'Menos de 35 %', name: 'Bajo', cls: 'bad', text: 'El estudiante presenta un desempeño reducido en las tareas cognitivas evaluadas. Puede requerir acompañamiento pedagógico, estrategias de aprendizaje diferenciadas y una revisión de los factores que pudieron influir en sus resultados, para determinar qué apoyos necesita.' }
 ];
-const levelFor = pct => LEVELS.find(l => pct >= l.min);
+/* `levels` es la rúbrica del examen (de mayor a menor 'min'); null = escala predeterminada */
+const levelFor = (pct, levels) => { const L = levels || LEVELS; return L.find(l => pct >= l.min) || L[L.length - 1]; };
 
 const app = $('#app');
-let session = null, ed = null, run = null, stream = null, gen = 0, cache = { exams: [] };
+let session = null, ed = null, rb = null, run = null, stream = null, gen = 0, cache = { exams: [], rubrics: [] };
 
 /* ---------- UI helpers ---------- */
 function toast(msg, kind = '') {
@@ -62,6 +63,11 @@ const loaders = {
     const counts = {}; att.forEach(a => counts[a.exam_id] = (counts[a.exam_id] || 0) + 1);
     return { exams, counts };
   },
+  async rubrics() {
+    cache.rubrics = await q(sb.from('rubrics').select('*').order('created_at', { ascending: false }));
+    return { rubrics: cache.rubrics };
+  },
+  async editor() { cache.rubrics = await q(sb.from('rubrics').select('*').order('name')); },
   async results(examId) {
     const [exams, attempts] = await Promise.all([
       q(sb.from('exams').select('*').order('created_at', { ascending: false })),
@@ -76,7 +82,7 @@ async function go(view, p) {
   const my = ++gen;
   try {
     if (!sb && view !== 'home') view = 'setup';
-    if (['teacher', 'results', 'editor'].includes(view) && !session) view = 'auth';
+    if (['teacher', 'results', 'editor', 'rubrics', 'rubedit'].includes(view) && !session) view = 'auth';
     let data = p;
     if (loaders[view]) { app.innerHTML = '<div class="loading">Cargando…</div>'; data = await loaders[view](p); }
     if (my !== gen) return;
@@ -87,7 +93,7 @@ async function go(view, p) {
 function redraw(view) { const y = scrollY; render(view); scrollTo(0, y); }
 function nav() {
   $('#topnav').innerHTML = session
-    ? '<a href="#" data-act="teacher">Mis exámenes</a><a href="#" data-act="results">Resultados</a><a href="#" data-act="logout">Cerrar sesión</a>'
+    ? '<a href="#" data-act="teacher">Mis exámenes</a><a href="#" data-act="rubrics">Rúbricas</a><a href="#" data-act="results">Resultados</a><a href="#" data-act="logout">Cerrar sesión</a>'
     : '<a href="#" data-act="join">Presentar examen</a><a href="#" data-act="tlogin">Profesores</a>';
 }
 function render(view, p) { nav(); app.innerHTML = views[view](p); }
@@ -144,7 +150,11 @@ const views = {
       <div><label>Duración (minutos)</label><input data-e="minutes" type="number" min="1" value="${e.minutes}"></div></div>
       <label class="chk"><input type="checkbox" data-e="camera" ${e.camera ? 'checked' : ''}> Exigir cámara (fotos periódicas y registro de salidas de la pestaña)</label>
       <label class="chk"><input type="checkbox" data-e="shuffle" ${e.shuffle ? 'checked' : ''}> Mezclar el orden de las preguntas</label>
-      <label class="chk"><input type="checkbox" data-e="show_score" ${e.show_score ? 'checked' : ''}> Mostrar la nota al estudiante al terminar</label></div>
+      <label class="chk"><input type="checkbox" data-e="show_score" ${e.show_score ? 'checked' : ''}> Mostrar la nota al estudiante al terminar</label>
+      <label>Rúbrica de resultados (mensaje que verá el estudiante según su nota)</label>
+      <select data-e="rubric_id"><option value="">Escala predeterminada</option>
+        ${cache.rubrics.map(r => `<option value="${r.id}" ${r.id === e.rubric_id ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select>
+      <span class="mut">Crea o edita rúbricas en la sección “Rúbricas” del menú.</span></div>
     ${e.questions.map(qHTML).join('')}
     <div class="row"><button class="sec" data-act="addq" data-t="mc">＋ Opción múltiple / V-F</button>
       <button class="sec" data-act="addq" data-t="text">＋ Respuesta corta</button>
@@ -155,6 +165,29 @@ const views = {
       <textarea id="bulktxt" placeholder="? ¿Capital de Guatemala?&#10;*a) Ciudad de Guatemala&#10;b) Antigua&#10;&#10;? 2 + 2 =&#10;= 4 | cuatro"></textarea>
       <p><button data-act="dobulk">Agregar preguntas</button></p></div>`;
   },
+
+  rubrics: ({ rubrics }) => `
+    <div class="row" style="margin-bottom:1rem"><h2 class="grow" style="margin:0">Rúbricas</h2>
+      <button data-act="newrubric">＋ Nueva rúbrica</button></div>
+    <p class="mut">Una rúbrica define el nombre y el mensaje que ve el estudiante según su porcentaje. Se asigna a cada examen al editarlo.</p>
+    ${rubrics.length ? rubrics.map(r => `<div class="card ex-card"><div class="grow"><h3 style="margin-bottom:.2rem">${esc(r.name)}</h3>
+        <div class="tags">${r.levels.map(l => `<span class="tag ${esc(l.cls)}">${esc(l.name)} · desde ${l.min} %</span>`).join('')}</div></div>
+        <div class="row"><button class="sm" data-act="editrubric" data-id="${r.id}">Editar</button>
+        <button class="sm danger" data-act="delrubric" data-id="${r.id}">Borrar</button></div></div>`).join('')
+      : '<div class="card empty"><div class="ic">🏅</div><p>Aún no tienes rúbricas. Mientras tanto, los exámenes usan la escala predeterminada.</p><button data-act="newrubric">Crear la primera</button></div>'}`,
+
+  rubedit: () => `
+    <div class="row" style="margin-bottom:1rem"><h2 class="grow" style="margin:0">${rb._new ? 'Nueva rúbrica' : 'Editar rúbrica'}</h2>
+      <button class="ghost" data-act="rubrics">Cancelar</button><button data-act="saverubric">Guardar rúbrica</button></div>
+    <div class="card"><label>Nombre de la rúbrica</label><input data-rb="name" value="${esc(rb.name)}" placeholder="Ej. Escala de aptitud cognitiva"></div>
+    ${rb.levels.map((l, i) => `<div class="card qcard"><div class="row"><span class="qnum">${i + 1}</span><span class="grow"></span>
+      <span class="mut">Desde (%)</span><input style="width:90px" type="number" min="0" max="100" data-l="${i}" data-lf="min" value="${esc(l.min)}">
+      <button class="sm danger" data-act="dellevel" data-l="${i}">Quitar</button></div>
+      <div class="grid"><div><label>Nombre del nivel</label><input data-l="${i}" data-lf="name" value="${esc(l.name)}" placeholder="Ej. Superior"></div>
+        <div><label>Color</label><select data-l="${i}" data-lf="cls">${[['ok', 'Verde'], ['', 'Neutro'], ['warn', 'Amarillo'], ['bad', 'Rojo']].map(([v, n]) => `<option value="${v}" ${l.cls === v ? 'selected' : ''}>${n}</option>`).join('')}</select></div></div>
+      <label>Mensaje para el estudiante</label><textarea data-l="${i}" data-lf="text">${esc(l.text)}</textarea></div>`).join('')}
+    <div class="row"><button class="sec" data-act="addlevel">＋ Nivel</button></div>
+    <p class="mut">Cada nivel aplica desde su porcentaje hasta el siguiente nivel más alto. Debe haber un nivel que empiece en 0 %.</p>`,
 
   results: ({ exams, attempts, examId }) => {
     const done = attempts.filter(a => a.ended_at && a.max_score);
@@ -173,7 +206,7 @@ const views = {
       const ex = exams.find(e => e.id === a.exam_id);
       return `<tr><td><b>${esc(a.student_name)}</b></td><td>${esc(ex ? ex.title : '')}</td>
       <td>${a.ended_at ? `<b>${a.score}</b>/${a.max_score}` : '<span class="tag warn">en curso</span>'}</td>
-      <td>${a.ended_at && a.max_score ? (l => `<span class="tag ${l.cls}">${l.name}</span>`)(levelFor(Math.round(a.score / a.max_score * 100))) : '<span class="mut">—</span>'}</td><td>${fdate(a.started_at)}</td>
+      <td>${a.ended_at && a.max_score ? (l => `<span class="tag ${esc(l.cls)}">${esc(l.name)}</span>`)(levelFor(Math.round(a.score / a.max_score * 100), ex?.levels)) : '<span class="mut">—</span>'}</td><td>${fdate(a.started_at)}</td>
       <td>${a.flags.length ? `<span class="tag bad">${a.flags.length}</span>` : '<span class="mut">—</span>'}</td>
       <td class="row"><button class="sm sec" data-act="detail" data-id="${a.id}">Ver</button>
       <button class="sm danger" data-act="delatt" data-id="${a.id}">✕</button></td></tr>`;
@@ -210,12 +243,12 @@ const views = {
   },
 
   done: p => {
-    const pct = p.show && p.max ? Math.round(p.score / p.max * 100) : 0, lv = levelFor(pct);
+    const pct = p.show && p.max ? Math.round(p.score / p.max * 100) : 0, lv = levelFor(pct, p.levels);
     return `
     <div class="card center" style="text-align:center;max-width:560px"><img class="logo-sm" src="logo.webp" alt="Calvary Christian School"><h2>Examen enviado</h2>
       ${p.show ? `<div class="big">${p.score} / ${p.max}</div><p class="mut">${pct}%</p>
-        <p><span class="tag lvl ${lv.cls}">Nivel: ${lv.name}</span></p>
-        <p class="lvltext">${lv.text}</p>` : '<p class="mut">Tu profesor te dará los resultados.</p>'}
+        <p><span class="tag lvl ${esc(lv.cls)}">Nivel: ${esc(lv.name)}</span></p>
+        <p class="lvltext">${esc(lv.text)}</p>` : '<p class="mut">Tu profesor te dará los resultados.</p>'}
       ${p.auto ? '<p class="mut">Se envió automáticamente al terminar el tiempo.</p>' : ''}
       <button data-act="home" style="margin-top:1rem">Volver al inicio</button></div>`;
   }
@@ -256,7 +289,7 @@ const acts = {
     try { await navigator.clipboard.writeText(url); toast('Enlace copiado', 'ok'); } catch { prompt('Copia el enlace:', url); }
   },
   exportexam: el => {
-    const { id, owner, created_at, ...x } = cache.exams.find(e => e.id === el.dataset.id);
+    const { id, owner, created_at, rubric_id, ...x } = cache.exams.find(e => e.id === el.dataset.id);
     download('examen.json', JSON.stringify(x, null, 1), 'application/json');
   },
   importexam: () => $('#impfile').click(),
@@ -268,6 +301,32 @@ const acts = {
   },
   delq: el => { ed.questions.splice(+el.dataset.q, 1); redraw('editor'); },
   addopt: el => { ed.questions[+el.dataset.q].options.push(''); redraw('editor'); },
+  rubrics: () => go('rubrics'),
+  newrubric: () => { rb = { _new: true, name: '', levels: LEVELS.map(({ min, name, cls, text }) => ({ min, name, cls, text })) }; go('rubedit'); },
+  editrubric: el => { rb = JSON.parse(JSON.stringify(cache.rubrics.find(r => r.id === el.dataset.id))); go('rubedit'); },
+  delrubric: async el => {
+    if (!await ask('¿Borrar la rúbrica? Los exámenes que ya la usan conservan sus mensajes actuales.', 'Borrar')) return;
+    await q(sb.from('rubrics').delete().eq('id', el.dataset.id)); go('rubrics');
+  },
+  addlevel: () => { rb.levels.push({ min: 0, name: '', cls: '', text: '' }); redraw('rubedit'); },
+  dellevel: el => { if (rb.levels.length <= 1) return; rb.levels.splice(+el.dataset.l, 1); redraw('rubedit'); },
+  saverubric: async () => {
+    const name = rb.name.trim();
+    if (!name) return toast('Pon un nombre a la rúbrica.', 'err');
+    for (const [i, l] of rb.levels.entries()) {
+      if (String(l.min).trim() === '' || !(+l.min >= 0 && +l.min <= 100)) return toast(`El nivel ${i + 1} necesita un porcentaje entre 0 y 100.`, 'err');
+      if (!l.name.trim()) return toast(`El nivel ${i + 1} necesita un nombre.`, 'err');
+    }
+    const levels = rb.levels.map(l => ({ min: +l.min, name: l.name.trim(), cls: l.cls || '', text: l.text.trim() })).sort((a, b) => b.min - a.min);
+    if (new Set(levels.map(l => l.min)).size !== levels.length) return toast('Dos niveles empiezan en el mismo porcentaje.', 'err');
+    if (levels[levels.length - 1].min !== 0) return toast('Debe haber un nivel que empiece en 0 % para cubrir todas las notas.', 'err');
+    if (rb._new) await q(sb.from('rubrics').insert({ name, levels }));
+    else {
+      await q(sb.from('rubrics').update({ name, levels }).eq('id', rb.id));
+      await q(sb.from('exams').update({ levels }).eq('rubric_id', rb.id)); // los exámenes que la usan se actualizan
+    }
+    toast('Rúbrica guardada', 'ok'); go('rubrics');
+  },
   delaudio: el => { const x = ed.questions[+el.dataset.q]; delete x.audio; delete x.plays; redraw('editor'); },
   delopt: el => {
     const x = ed.questions[+el.dataset.q], o = +el.dataset.o;
@@ -289,7 +348,8 @@ const acts = {
       if (x.audio && !/^(data:audio\/|https:\/\/)/i.test(x.audio)) return toast(`El audio de la pregunta ${i + 1} debe ser un archivo o un enlace https://.`, 'err');
       if (!x.audio) { delete x.audio; delete x.plays; }
     }
-    const row = { title: ed.title.trim(), code: ed.code, minutes: ed.minutes, camera: ed.camera, shuffle: ed.shuffle, show_score: ed.show_score, questions: ed.questions };
+    const row = { title: ed.title.trim(), code: ed.code, minutes: ed.minutes, camera: ed.camera, shuffle: ed.shuffle, show_score: ed.show_score, questions: ed.questions,
+      rubric_id: ed.rubric_id || null, levels: cache.rubrics.find(r => r.id === ed.rubric_id)?.levels || null };
     try {
       await q(ed._new ? sb.from('exams').insert(row) : sb.from('exams').update(row).eq('id', ed.id));
     } catch (e) { throw new Error(e.code === '23505' ? 'Ya existe otro examen con ese código.' : e.message); }
@@ -329,7 +389,9 @@ $('#brand').addEventListener('click', async e => {
 
 document.addEventListener('input', e => {
   const t = e.target;
-  if (t.dataset.e) ed[t.dataset.e] = t.type === 'checkbox' ? t.checked : t.type === 'number' ? Math.max(1, +t.value || 1) : t.value;
+  if (t.dataset.lf) rb.levels[+t.dataset.l][t.dataset.lf] = t.value;
+  else if (t.dataset.rb) rb[t.dataset.rb] = t.value;
+  else if (t.dataset.e) ed[t.dataset.e] = t.type === 'checkbox' ? t.checked : t.type === 'number' ? Math.max(1, +t.value || 1) : t.value;
   else if (t.dataset.f) {
     const x = ed.questions[+t.dataset.q];
     if (t.dataset.f === 'answers') x.answers = t.value.split('|').map(s => s.trim()).filter(Boolean);
@@ -367,7 +429,7 @@ document.addEventListener('change', async e => {
       const x = JSON.parse(await t.files[0].text());
       for (const ex of Array.isArray(x) ? x : [x]) {
         if (!ex.questions || !ex.title) throw new Error('Archivo JSON no válido.');
-        const row = { title: ex.title, code: String(ex.code || uid()).toUpperCase(), minutes: ex.minutes || 30, camera: !!ex.camera, shuffle: !!ex.shuffle, show_score: ex.show_score !== false, questions: ex.questions };
+        const row = { title: ex.title, code: String(ex.code || uid()).toUpperCase(), minutes: ex.minutes || 30, camera: !!ex.camera, shuffle: !!ex.shuffle, show_score: ex.show_score !== false, questions: ex.questions, ...(ex.levels ? { levels: ex.levels } : {}) };
         for (let i = 0; ; i++) {
           const { error } = await sb.from('exams').insert(i ? { ...row, code: row.code + i } : row);
           if (!error) break; if (error.code !== '23505' || i > 20) throw error;
@@ -462,7 +524,7 @@ async function showDetail(id) {
   const ex = cache.exams.find(e => e.id === a.exam_id);
   const m = document.createElement('div'); m.className = 'modal';
   m.innerHTML = `<div class="card"><div class="row"><h3 class="grow">${esc(a.student_name)} — ${esc(ex?.title || '')}</h3><button class="sm sec" data-act="closemodal">Cerrar</button></div>
-    <p>Nota: <b>${a.score ?? '—'}/${a.max_score ?? '—'}</b>${a.ended_at && a.max_score ? (p => ` (${p} %) · Nivel: <b>${levelFor(p).name}</b>`)(Math.round(a.score / a.max_score * 100)) : ''} · Inicio: ${fdate(a.started_at)}${a.ended_at ? ' · Duración: ' + fmt(new Date(a.ended_at) - new Date(a.started_at)) : ''}</p>
+    <p>Nota: <b>${a.score ?? '—'}/${a.max_score ?? '—'}</b>${a.ended_at && a.max_score ? (p => ` (${p} %) · Nivel: <b>${esc(levelFor(p, ex?.levels).name)}</b>`)(Math.round(a.score / a.max_score * 100)) : ''} · Inicio: ${fdate(a.started_at)}${a.ended_at ? ' · Duración: ' + fmt(new Date(a.ended_at) - new Date(a.started_at)) : ''}</p>
     <h4>Alertas (${a.flags.length})</h4>${a.flags.length ? '<ul>' + a.flags.map(f => `<li>${new Date(f.t).toLocaleTimeString('es')} — ${esc(f.msg)}</li>`).join('') + '</ul>' : '<p class="mut">Sin alertas.</p>'}
     <h4>Fotos de la cámara (${shots.length})</h4><div class="shots">${shots.map(s => `<img src="${s.img}" title="${new Date(s.taken_at).toLocaleTimeString('es')}">`).join('') || '<span class="mut">Sin fotos.</span>'}</div>
     <h4 style="margin-top:1rem">Respuestas</h4>${ex ? ex.questions.map((x, i) => {
@@ -575,7 +637,7 @@ async function finishExam(auto) {
     try {
       const r = await rpc('student_submit', { p_attempt: at.id, p_token: at.token, p_answers: at.answers });
       cleanupRun();
-      render('done', { show: r.show, score: r.score, max: r.max, auto });
+      render('done', { show: r.show, score: r.score, max: r.max, levels: r.levels, auto });
       return;
     } catch (e) {
       if (!run) return;

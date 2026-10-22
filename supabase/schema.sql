@@ -21,6 +21,20 @@ create table if not exists public.exams (
   created_at  timestamptz not null default now()
 );
 
+-- Rúbricas: mensajes que se muestran según el porcentaje obtenido.
+--  levels = [{min, name, cls:'ok'|'warn'|'bad'|'', text}], de mayor a menor 'min'.
+create table if not exists public.rubrics (
+  id          uuid primary key default gen_random_uuid(),
+  owner       uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  name        text not null,
+  levels      jsonb not null default '[]',
+  created_at  timestamptz not null default now()
+);
+-- El examen guarda una copia de los niveles (levels) para que el estudiante la reciba sin acceder a las tablas.
+-- levels null = escala predeterminada de la app.
+alter table public.exams add column if not exists rubric_id uuid references public.rubrics(id) on delete set null;
+alter table public.exams add column if not exists levels jsonb;
+
 create table if not exists public.attempts (
   id           uuid primary key default gen_random_uuid(),
   exam_id      uuid not null references public.exams(id) on delete cascade,
@@ -45,9 +59,14 @@ create table if not exists public.shots (
 );
 create index if not exists shots_attempt_idx on public.shots(attempt_id);
 
+alter table public.rubrics  enable row level security;
 alter table public.exams    enable row level security;
 alter table public.attempts enable row level security;
 alter table public.shots    enable row level security;
+
+drop policy if exists rubrics_owner on public.rubrics;
+create policy rubrics_owner on public.rubrics for all to authenticated
+  using (owner = auth.uid()) with check (owner = auth.uid());
 
 drop policy if exists exams_owner on public.exams;
 create policy exams_owner on public.exams for all to authenticated
@@ -198,7 +217,8 @@ begin
   end if;
   return jsonb_build_object('show', e.show_score,
     'score', case when e.show_score then a.score end,
-    'max',   case when e.show_score then a.max_score end);
+    'max',   case when e.show_score then a.max_score end,
+    'levels', case when e.show_score then e.levels end);
 end $$;
 
 -- ---------- Permisos ----------
