@@ -199,6 +199,7 @@ const views = {
     <div class="examwrap"><div>
       ${qs.map((x, i) => `<div class="card qcard" id="q${i}"><div class="row"><span class="qnum">${i + 1}</span><span class="mut">${x.points} ${x.points == 1 ? 'punto' : 'puntos'}</span></div>
         <p style="white-space:pre-wrap;margin:.6rem 0">${esc(x.text)}</p>
+        ${audioPlayHTML(x)}
         ${x.type === 'mc' ? x.options.map((o, oi) => `<label class="ans"><input type="radio" name="${x.id}" data-qid="${x.id}" value="${oi}" ${at.answers[x.id] === oi ? 'checked' : ''}>${esc(o)}</label>`).join('')
         : `<input data-qid="${x.id}" placeholder="Escribe tu respuesta" value="${esc(at.answers[x.id] ?? '')}" autocomplete="off">`}
       </div>`).join('')}
@@ -263,6 +264,7 @@ const acts = {
   },
   delq: el => { ed.questions.splice(+el.dataset.q, 1); redraw('editor'); },
   addopt: el => { ed.questions[+el.dataset.q].options.push(''); redraw('editor'); },
+  delaudio: el => { const x = ed.questions[+el.dataset.q]; delete x.audio; delete x.plays; redraw('editor'); },
   delopt: el => {
     const x = ed.questions[+el.dataset.q], o = +el.dataset.o;
     if (x.options.length <= 2) return;
@@ -280,6 +282,8 @@ const acts = {
       if (!x.text.trim()) return toast(`La pregunta ${i + 1} está vacía.`, 'err');
       if (x.type === 'mc' && x.options.some(o => !o.trim())) return toast(`La pregunta ${i + 1} tiene opciones vacías.`, 'err');
       if (x.type === 'text' && !x.answers.length) return toast(`La pregunta ${i + 1} necesita una respuesta aceptada.`, 'err');
+      if (x.audio && !/^(data:audio\/|https:\/\/)/i.test(x.audio)) return toast(`El audio de la pregunta ${i + 1} debe ser un archivo o un enlace https://.`, 'err');
+      if (!x.audio) { delete x.audio; delete x.plays; }
     }
     const row = { title: ed.title.trim(), code: ed.code, minutes: ed.minutes, camera: ed.camera, shuffle: ed.shuffle, show_score: ed.show_score, questions: ed.questions };
     try {
@@ -326,6 +330,7 @@ document.addEventListener('input', e => {
     const x = ed.questions[+t.dataset.q];
     if (t.dataset.f === 'answers') x.answers = t.value.split('|').map(s => s.trim()).filter(Boolean);
     else if (t.dataset.f === 'points') x.points = Math.max(0, +t.value || 0);
+    else if (t.dataset.f === 'plays') x.plays = Math.max(0, Math.floor(+t.value || 0));
     else x[t.dataset.f] = t.value;
   } else if (t.dataset.o !== undefined) ed.questions[+t.dataset.q].options[+t.dataset.o] = t.value;
   else if (t.dataset.qid && run) {
@@ -337,6 +342,19 @@ document.addEventListener('change', async e => {
   const t = e.target;
   if (t.dataset.correct !== undefined) ed.questions[+t.dataset.q].correct = +t.dataset.correct;
   if (t.id === 'resfilter') go('results', t.value);
+  if (t.dataset.afile !== undefined && t.files[0]) {
+    const f = t.files[0], x = ed.questions[+t.dataset.afile];
+    if (!f.type.startsWith('audio/')) { t.value = ''; return toast('Elige un archivo de audio.', 'err'); }
+    if (f.size > AUDIO_MAX) { t.value = ''; return toast('El audio pesa más de 1.5 MB. Comprímelo o usa un enlace.', 'err'); }
+    x.audio = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); });
+    redraw('editor');
+  }
+  if (t.dataset.aurl !== undefined) {
+    const v = t.value.trim(), x = ed.questions[+t.dataset.q];
+    if (!v) return;
+    if (!/^https:\/\//i.test(v)) return toast('El enlace debe empezar con https://', 'err');
+    x.audio = v; redraw('editor');
+  }
   if (t.id === 'impfile' && t.files[0]) {
     try {
       const x = JSON.parse(await t.files[0].text());
@@ -358,6 +376,7 @@ function qHTML(x, i) {
     <span class="mut">Puntos</span><input style="width:80px" type="number" min="0" step="0.5" data-q="${i}" data-f="points" value="${x.points}">
     <button class="sm danger" data-act="delq" data-q="${i}">Quitar</button></div>
     <label>Enunciado</label><textarea data-q="${i}" data-f="text">${esc(x.text)}</textarea>
+    ${audioEditHTML(x, i)}
     ${x.type === 'mc' ? `<label>Opciones (marca la correcta)</label>
       ${x.options.map((o, oi) => `<div class="opt"><input type="radio" name="c${i}" data-q="${i}" data-correct="${oi}" ${x.correct === oi ? 'checked' : ''}>
         <input type="text" data-q="${i}" data-o="${oi}" value="${esc(o)}" placeholder="Opción ${oi + 1}">
@@ -366,6 +385,52 @@ function qHTML(x, i) {
       : `<label>Respuestas aceptadas (separa con |)</label><input data-q="${i}" data-f="answers" value="${esc(x.answers.join(' | '))}">
       <span class="mut">No distingue mayúsculas ni acentos.</span>`}</div>`;
 }
+
+/* ---------- Pistas de audio ---------- */
+const AUDIO_MAX = 1.5 * 1024 * 1024;
+function audioEditHTML(x, i) {
+  if (x.audio) return `<div class="audbox"><label>Pista de audio</label>
+    <audio controls preload="metadata" src="${esc(x.audio)}"></audio>
+    <div class="row"><span class="mut">Reproducciones permitidas (0 = sin límite)</span>
+      <input style="width:80px" type="number" min="0" data-q="${i}" data-f="plays" value="${x.plays || 0}">
+      <span class="grow"></span><button class="sm danger" data-act="delaudio" data-q="${i}">Quitar audio</button></div></div>`;
+  return `<div class="audbox"><label>Pista de audio (opcional)</label>
+    <div class="row"><input type="file" accept="audio/*" data-afile="${i}" style="flex:1">
+      <input type="text" data-q="${i}" data-aurl placeholder="…o pega un enlace https:// a un .mp3" style="flex:1"></div>
+    <span class="mut">Archivo de hasta 1.5 MB (MP3 recomendado) o enlace directo.</span></div>`;
+}
+function audioPlayHTML(x) {
+  if (!x.audio) return '';
+  const left = x.plays ? x.plays - (run.plays[x.id] || 0) : null;
+  return `<div class="audbox" id="aud-${x.id}">${left === 0 ? '<span class="mut">🔇 Ya usaste todas las reproducciones de este audio.</span>'
+    : `<audio controls controlsList="nodownload noplaybackrate" preload="auto" data-aqid="${x.id}" src="${esc(x.audio)}"></audio>`}
+    ${left === null ? '' : `<span class="mut" data-aleft="${x.id}">Reproducciones restantes: ${left}</span>`}</div>`;
+}
+/* Los eventos de media no burbujean: se capturan a nivel de documento.
+   Una reproducción se cuenta al iniciarla (no al terminar); pausar y seguir no cuenta.
+   Con límite, se bloquea adelantar/retroceder para que no se pueda rebobinar. */
+const audioInfo = e => {
+  const qid = e.target.dataset?.aqid;
+  return qid && run ? { el: e.target, qid, x: run.info.questions.find(z => z.id === qid) } : null;
+};
+document.addEventListener('play', e => {
+  const a = audioInfo(e); if (!a || a.el._counted) return;
+  a.el._counted = true;
+  run.plays[a.qid] = (run.plays[a.qid] || 0) + 1;
+  try { localStorage.setItem('plays:' + run.at.id, JSON.stringify(run.plays)); } catch { }
+  if (!a.x.plays) return;
+  $(`[data-aleft="${a.qid}"]`).textContent = 'Reproducciones restantes: ' + Math.max(0, a.x.plays - run.plays[a.qid]);
+}, true);
+document.addEventListener('timeupdate', e => { const a = audioInfo(e); if (a && !a.el.seeking) a.el._t = a.el.currentTime; }, true);
+document.addEventListener('seeking', e => {
+  const a = audioInfo(e);
+  if (a && a.x.plays && a.el._t !== undefined && Math.abs(a.el.currentTime - a.el._t) > .7) a.el.currentTime = a.el._t;
+}, true);
+document.addEventListener('ended', e => {
+  const a = audioInfo(e); if (!a) return;
+  a.el._counted = false; a.el._t = 0;
+  if (a.x.plays && a.x.plays - run.plays[a.qid] <= 0) $('#aud-' + a.qid).innerHTML = '<span class="mut">🔇 Ya usaste todas las reproducciones de este audio.</span>';
+}, true);
 
 function parseText(t) {
   const qs = []; let cur = null;
@@ -439,7 +504,8 @@ function runExam(r) {
   const offset = new Date(r.now).getTime() - Date.now();
   const end = new Date(r.started_at).getTime() + r.minutes * 60000;
   const at = { id: r.attempt_id, token: r.token, order: r.order, answers: r.answers || {} };
-  run = { info: r, at, timers: [], handlers: [], dirty: false, last: {}, end, offset };
+  let plays = {}; try { plays = JSON.parse(localStorage.getItem('plays:' + r.attempt_id) || '{}'); } catch { }
+  run = { info: r, at, timers: [], handlers: [], dirty: false, last: {}, end, offset, plays };
   render('exam');
   window.scrollTo(0, 0);
   if (stream && r.camera) {
