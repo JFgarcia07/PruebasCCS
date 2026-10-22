@@ -87,7 +87,7 @@ async function go(view, p) {
 function redraw(view) { const y = scrollY; render(view); scrollTo(0, y); }
 function nav() {
   $('#topnav').innerHTML = session
-    ? '<a href="#" data-act="teacher">Mis exámenes</a><a href="#" data-act="results">Resultados</a><a href="#" data-act="logout">Salir</a>'
+    ? '<a href="#" data-act="teacher">Mis exámenes</a><a href="#" data-act="results">Resultados</a><a href="#" data-act="logout">Cerrar sesión</a>'
     : '<a href="#" data-act="join">Presentar examen</a><a href="#" data-act="tlogin">Profesores</a>';
 }
 function render(view, p) { nav(); app.innerHTML = views[view](p); }
@@ -237,7 +237,11 @@ const acts = {
     if (error) throw error;
     if (data.session) go('teacher'); else toast('Cuenta creada. Revisa tu correo para confirmarla y luego entra.', 'ok');
   },
-  logout: async () => { await sb.auth.signOut(); go('home'); },
+  logout: async () => {
+    // 'local' borra la sesión de este navegador aunque no haya conexión con el servidor
+    await sb.auth.signOut({ scope: 'local' }).catch(() => { });
+    session = null; ed = null; go('home');
+  },
   newexam: () => {
     ed = { _new: true, title: '', code: Math.random().toString(36).slice(2, 7).toUpperCase(), minutes: 30, camera: true, shuffle: false, show_score: true, questions: [] };
     go('editor');
