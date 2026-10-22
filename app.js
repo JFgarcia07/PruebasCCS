@@ -348,9 +348,12 @@ document.addEventListener('change', async e => {
   if (t.id === 'resfilter') go('results', t.value);
   if (t.dataset.afile !== undefined && t.files[0]) {
     const f = t.files[0], x = ed.questions[+t.dataset.afile];
-    if (!f.type.startsWith('audio/')) { t.value = ''; return toast('Elige un archivo de audio.', 'err'); }
+    // Un .mpeg/.mpg suele venir como video/mpeg; el audio MPEG es el mismo formato que MP3 (audio/mpeg)
+    const mpeg = /\.(mp3|mpeg|mpg|mpga)$/i.test(f.name) && (!f.type || /^(audio|video)\/mpeg$/.test(f.type));
+    if (!f.type.startsWith('audio/') && !mpeg) { t.value = ''; return toast('Elige un archivo de audio.', 'err'); }
     if (f.size > AUDIO_MAX) { t.value = ''; return toast('El audio pesa más de 1.5 MB. Comprímelo o usa un enlace.', 'err'); }
     x.audio = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); });
+    if (!x.audio.startsWith('data:audio/')) x.audio = x.audio.replace(/^data:[^;,]*/, 'data:audio/mpeg');
     redraw('editor');
   }
   if (t.dataset.aurl !== undefined) {
@@ -399,7 +402,7 @@ function audioEditHTML(x, i) {
       <input style="width:80px" type="number" min="0" data-q="${i}" data-f="plays" value="${x.plays || 0}">
       <span class="grow"></span><button class="sm danger" data-act="delaudio" data-q="${i}">Quitar audio</button></div></div>`;
   return `<div class="audbox"><label>Pista de audio (opcional)</label>
-    <div class="row"><input type="file" accept="audio/*" data-afile="${i}" style="flex:1">
+    <div class="row"><input type="file" accept="audio/*,.mp3,.mpeg,.mpga,.mpg" data-afile="${i}" style="flex:1">
       <input type="text" data-q="${i}" data-aurl placeholder="…o pega un enlace https:// a un .mp3" style="flex:1"></div>
     <span class="mut">Archivo de hasta 1.5 MB (MP3 recomendado) o enlace directo.</span></div>`;
 }
