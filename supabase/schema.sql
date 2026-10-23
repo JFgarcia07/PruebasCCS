@@ -229,3 +229,118 @@ revoke all on function public.student_exam_info(text), public.student_start(text
 grant execute on function public.student_exam_info(text), public.student_start(text, text, uuid),
   public.student_save(uuid, uuid, jsonb), public.student_flag(uuid, uuid, text),
   public.student_shot(uuid, uuid, text), public.student_submit(uuid, uuid, jsonb) to anon, authenticated;
+
+
+-- =====================================================================
+-- REPORTES DE ESTUDIANTE
+-- Un profesor crea el reporte de UN estudiante y comparte el enlace. Cada docente que lo recibe
+-- elige su curso y deja la nota de la unidad y un comentario (sin cuenta, vía RPC).
+-- Ejecutar esta sección es seguro aunque ya hayas corrido lo anterior.
+-- =====================================================================
+create table if not exists public.reports (
+  id           uuid primary key default gen_random_uuid(),
+  owner        uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  title        text not null,
+  student_name text not null,
+  grade_level  text not null default '',
+  period       text not null default '',
+  code         text not null unique,
+  max_score    numeric not null default 100 check (max_score > 0),
+  courses      jsonb not null default '[]',   -- lista de cursos a elegir; vacía = el docente escribe el curso
+  rubric_id    uuid references public.rubrics(id) on delete set null,
+  levels       jsonb,                         -- copia de la rúbrica (null = sin rúbrica)
+  created_at   timestamptz not null default now()
+);
+
+create table if not exists public.report_entries (
+  id           uuid primary key default gen_random_uuid(),
+  report_id    uuid not null references public.reports(id) on delete cascade,
+  course       text not null,
+  course_key   text not null,                 -- curso normalizado: un registro por curso
+  teacher_name text not null,
+  score        numeric not null,
+  comment      text not null default '',
+  token        uuid not null default gen_random_uuid(),  -- secreto del docente para corregir su registro
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now(),
+  unique (report_id, course_key)
+);
+
+alter table public.reports        enable row level security;
+alter table public.report_entries enable row level security;
+
+drop policy if exists reports_owner on public.reports;
+create policy reports_owner on public.reports for all to authenticated
+  using (owner = auth.uid()) with check (owner = auth.uid());
+
+drop policy if exists report_entries_owner_select on public.report_entries;
+create policy report_entries_owner_select on public.report_entries for select to authenticated
+  using (exists (select 1 from public.reports r where r.id = report_id and r.owner = auth.uid()));
+drop policy if exists report_entries_owner_delete on public.report_entries;
+create policy report_entries_owner_delete on public.report_entries for delete to authenticated
+  using (exists (select 1 from public.reports r where r.id = report_id and r.owner = auth.uid()));
+
+create or replace function public.report_info(p_code text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare r public.reports;
+begin
+  select * into r from public.reports where code = upper(btrim(p_code));
+  if not found then raise exception 'Reporte no encontrado'; end if;
+  return jsonb_build_object('title', r.title, 'student_name', r.student_name, 'grade_level', r.grade_level,
+    'period', r.period, 'max_score', r.max_score, 'courses', r.courses,
+    'filled', (select coalesce(jsonb_agg(course), '[]') from public.report_entries where report_id = r.id));
+end $$;
+
+create or replace function public.report_submit(p_code text, p_course text, p_teacher text, p_score numeric,
+                                                p_comment text, p_token uuid default null)
+returns jsonb language plpgsql security definer set search_path = public, extensions as $$
+declare r public.reports; en public.report_entries; c text; k text; listed text;
+begin
+  select * into r from public.reports where code = upper(btrim(p_code));
+  if not found then raise exception 'Reporte no encontrado'; end if;
+  c := left(btrim(coalesce(p_course, '')), 100);
+  if c = '' then raise exception 'Selecciona el curso'; end if;
+  if btrim(coalesce(p_teacher, '')) = '' then raise exception 'Escribe tu nombre'; end if;
+  if jsonb_array_length(r.courses) > 0 then
+    select x into listed from jsonb_array_elements_text(r.courses) x where public._norm(x) = public._norm(c) limit 1;
+    if listed is null then raise exception 'Curso no válido para este reporte'; end if;
+    c := listed;
+  end if;
+  if p_score is null or p_score < 0 or p_score > r.max_score then
+    raise exception 'La nota debe estar entre 0 y %', r.max_score;
+  end if;
+  k := public._norm(c);
+
+  select * into en from public.report_entries where report_id = r.id and course_key = k;
+  if found then
+    if p_token is distinct from en.token then raise exception 'Ese curso ya fue registrado por otro docente'; end if;
+    update public.report_entries
+       set teacher_name = left(btrim(p_teacher), 120), score = p_score, comment = left(coalesce(p_comment, ''), 2000), updated_at = now()
+     where id = en.id returning * into en;
+  else
+    if (select count(*) from public.report_entries where report_id = r.id) >= 100 then
+      raise exception 'Este reporte ya alcanzó el máximo de registros';
+    end if;
+    insert into public.report_entries (report_id, course, course_key, teacher_name, score, comment)
+      values (r.id, c, k, left(btrim(p_teacher), 120), p_score, left(coalesce(p_comment, ''), 2000))
+      returning * into en;
+  end if;
+  return jsonb_build_object('token', en.token, 'course', en.course);
+end $$;
+
+create or replace function public.report_my_entry(p_code text, p_course text, p_token uuid) returns jsonb
+language plpgsql security definer set search_path = public, extensions as $$
+declare r public.reports; en public.report_entries;
+begin
+  select * into r from public.reports where code = upper(btrim(p_code));
+  if not found then return null; end if;
+  select * into en from public.report_entries
+   where report_id = r.id and course_key = public._norm(p_course) and token = p_token;
+  if not found then return null; end if;
+  return jsonb_build_object('teacher', en.teacher_name, 'score', en.score, 'comment', en.comment);
+end $$;
+
+revoke all on function public.report_info(text), public.report_submit(text, text, text, numeric, text, uuid),
+  public.report_my_entry(text, text, uuid) from public;
+grant execute on function public.report_info(text), public.report_submit(text, text, text, numeric, text, uuid),
+  public.report_my_entry(text, text, uuid) to anon, authenticated;
