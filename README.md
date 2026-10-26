@@ -24,3 +24,11 @@ Frontend estático (HTML/CSS/JS) + Supabase (Auth, Postgres con RLS, funciones R
 - Los demás docentes abren el enlace sin cuenta, eligen su curso y dejan la nota de la unidad y un comentario (RPC `report_*`). Un curso solo lo puede corregir el navegador que lo registró (token secreto).
 - **Resultados** (botón en esa pantalla o en el reporte): tabla con todo lo registrado, promedio, cursos pendientes y **descarga en PDF** (jsPDF desde cdnjs).
 - Si cambias de proyecto Supabase, vuelve a ejecutar `supabase/schema.sql` (la sección de reportes es idempotente).
+
+## Enviar exámenes a otro profesor
+- En **Mis exámenes** → **📤 Enviar exámenes**: elige los exámenes y escribe el correo de otro profesor (debe tener cuenta). Pasan a su cuenta con todos sus intentos y desaparecen de la tuya (RPC `transfer_exams`). La rúbrica vinculada se desvincula, pero el examen conserva sus niveles.
+
+## Rendimiento (≈50 estudiantes a la vez)
+- El listado de exámenes ya no descarga las preguntas (con audios pesan MB): usa `n_questions` y la RPC `my_exam_counts`; el examen completo se pide solo al editar, exportar o ver un intento.
+- El autoguardado, la verificación del código y el resto de las RPC de estudiante ya no leen el examen completo.
+- Se añadieron índices. **Vuelve a ejecutar `supabase/schema.sql` completo** en el SQL Editor para aplicar todo.

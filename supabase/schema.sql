@@ -125,9 +125,9 @@ end $$;
 -- ---------- API para estudiantes (anon) ----------
 create or replace function public.student_exam_info(p_code text) returns jsonb
 language plpgsql security definer set search_path = public as $$
-declare e public.exams;
+declare e record;
 begin
-  select * into e from public.exams where code = upper(btrim(p_code));
+  select title, minutes, camera into e from public.exams where code = upper(btrim(p_code));
   if not found then raise exception 'Código no encontrado'; end if;
   return jsonb_build_object('title', e.title, 'minutes', e.minutes, 'camera', e.camera);
 end $$;
@@ -169,12 +169,12 @@ end $$;
 
 create or replace function public.student_save(p_attempt uuid, p_token uuid, p_answers jsonb) returns void
 language plpgsql security definer set search_path = public as $$
-declare a public.attempts; e public.exams;
+declare a public.attempts; mins int;
 begin
   a := public._attempt(p_attempt, p_token);
-  select * into e from public.exams where id = a.exam_id;
+  select minutes into mins from public.exams where id = a.exam_id;   -- solo la duración: el examen completo pesa MB
   if a.ended_at is not null then raise exception 'El examen ya fue enviado'; end if;
-  if now() > a.started_at + make_interval(mins => e.minutes) + interval '30 seconds' then
+  if now() > a.started_at + make_interval(mins => mins) + interval '30 seconds' then
     raise exception 'Tiempo agotado';
   end if;
   update public.attempts set answers = coalesce(p_answers, '{}') where id = a.id;
@@ -344,3 +344,53 @@ revoke all on function public.report_info(text), public.report_submit(text, text
   public.report_my_entry(text, text, uuid) from public;
 grant execute on function public.report_info(text), public.report_submit(text, text, text, numeric, text, uuid),
   public.report_my_entry(text, text, uuid) to anon, authenticated;
+
+
+-- =====================================================================
+-- RENDIMIENTO Y TRANSFERENCIA DE EXÁMENES
+-- Ejecutar esta sección es seguro aunque ya hayas corrido lo anterior.
+-- =====================================================================
+
+-- Número de preguntas guardado aparte: el listado de exámenes ya no descarga las preguntas
+-- (con audios incrustados pueden pesar varios MB por examen).
+alter table public.exams add column if not exists n_questions int not null default 0;
+
+create or replace function public._exam_count() returns trigger language plpgsql as $$
+begin new.n_questions := jsonb_array_length(new.questions); return new; end $$;
+drop trigger if exists exams_count on public.exams;
+create trigger exams_count before insert or update of questions on public.exams
+  for each row execute function public._exam_count();
+update public.exams set n_questions = jsonb_array_length(questions) where n_questions = 0;
+
+create index if not exists exams_owner_idx on public.exams(owner, created_at desc);
+create index if not exists attempts_started_idx on public.attempts(exam_id, started_at desc);
+create index if not exists reports_owner_idx on public.reports(owner, created_at desc);
+create index if not exists report_entries_report_idx on public.report_entries(report_id);
+
+-- Conteo de intentos por examen en el servidor (en vez de bajar todos los intentos).
+create or replace function public.my_exam_counts() returns table(exam_id uuid, n bigint)
+language sql stable security invoker set search_path = public as $$
+  select a.exam_id, count(*) from public.attempts a group by a.exam_id
+$$;
+revoke all on function public.my_exam_counts() from public, anon;
+grant execute on function public.my_exam_counts() to authenticated;
+
+-- Pasa exámenes (con sus intentos y fotos) a otro profesor registrado, por correo.
+-- Los exámenes dejan de aparecer en la cuenta de origen. La rúbrica vinculada se desvincula
+-- (pertenece al profesor original), pero el examen conserva una copia de sus niveles.
+create or replace function public.transfer_exams(p_ids uuid[], p_email text) returns jsonb
+language plpgsql security definer set search_path = public, auth as $$
+declare me uuid := auth.uid(); target uuid; n int;
+begin
+  if me is null then raise exception 'Inicia sesión primero'; end if;
+  if p_ids is null or coalesce(array_length(p_ids, 1), 0) = 0 then raise exception 'Elige al menos un examen'; end if;
+  select id into target from auth.users where lower(email) = lower(btrim(coalesce(p_email, ''))) limit 1;
+  if target is null then raise exception 'No hay ninguna cuenta registrada con ese correo. Pídele que cree su cuenta primero.'; end if;
+  if target = me then raise exception 'Ese correo es el de tu propia cuenta'; end if;
+  update public.exams set owner = target, rubric_id = null where id = any(p_ids) and owner = me;
+  get diagnostics n = row_count;
+  if n = 0 then raise exception 'No se encontró ningún examen tuyo para enviar'; end if;
+  return jsonb_build_object('sent', n);
+end $$;
+revoke all on function public.transfer_exams(uuid[], text) from public, anon;
+grant execute on function public.transfer_exams(uuid[], text) to authenticated;

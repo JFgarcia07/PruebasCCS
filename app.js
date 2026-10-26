@@ -24,6 +24,8 @@ const LEVELS = [
 /* `levels` es la rúbrica del examen (de mayor a menor 'min'); null = escala predeterminada */
 const levelFor = (pct, levels) => { const L = levels || LEVELS; return L.find(l => pct >= l.min) || L[L.length - 1]; };
 
+const EXAM_COLS = 'id,title,code,minutes,camera,shuffle,show_score,rubric_id,levels,created_at,n_questions'; // sin 'questions': con audios incrustados pesa MB
+const fullExam = id => q(sb.from('exams').select('*').eq('id', id).single());
 const app = $('#app');
 let session = null, ed = null, rb = null, rp = null, rf = null, run = null, stream = null, gen = 0, cache = { exams: [], rubrics: [], reports: [] };
 
@@ -57,10 +59,10 @@ async function q(p) { const { data, error } = await p; if (error) throw error; r
 const loaders = {
   async teacher() {
     const [exams, att] = await Promise.all([
-      q(sb.from('exams').select('*').order('created_at', { ascending: false })),
-      q(sb.from('attempts').select('exam_id'))]);
+      q(sb.from('exams').select(EXAM_COLS).order('created_at', { ascending: false })),
+      q(sb.rpc('my_exam_counts'))]);
     cache.exams = exams;
-    const counts = {}; att.forEach(a => counts[a.exam_id] = (counts[a.exam_id] || 0) + 1);
+    const counts = {}; att.forEach(a => counts[a.exam_id] = Number(a.n));
     return { exams, counts };
   },
   async rubrics() {
@@ -91,7 +93,7 @@ const loaders = {
   },
   async results(examId) {
     const [exams, attempts] = await Promise.all([
-      q(sb.from('exams').select('*').order('created_at', { ascending: false })),
+      q(sb.from('exams').select(EXAM_COLS).order('created_at', { ascending: false })),
       q(sb.from('attempts').select('id,exam_id,student_name,started_at,ended_at,score,max_score,flags').order('started_at', { ascending: false }))]);
     cache.exams = exams;
     return { exams, attempts: attempts.filter(a => !examId || a.exam_id === examId), examId };
@@ -148,10 +150,11 @@ const views = {
     <div class="row" style="margin-bottom:1rem"><h2 class="grow" style="margin:0">Mis exámenes</h2>
       <button data-act="newexam">＋ Nuevo examen</button>
       <button class="sec" data-act="importexam">Importar JSON</button>
+      ${exams.length ? '<button class="sec" data-act="sendexams">📤 Enviar exámenes</button>' : ''}
       <input type="file" id="impfile" accept=".json" hidden></div>
     ${exams.length ? exams.map(e => `<div class="card ex-card"><div class="grow"><h3 style="margin-bottom:.2rem">${esc(e.title)}</h3>
         <div class="tags"><span class="tag">Código <span class="code">${esc(e.code)}</span></span>
-        <span class="tag">⏱ ${e.minutes} min</span><span class="tag">${e.questions.length} preguntas</span>
+        <span class="tag">⏱ ${e.minutes} min</span><span class="tag">${e.n_questions} preguntas</span>
         ${e.camera ? '<span class="tag warn">📷 cámara</span>' : ''}<span class="tag ok">${counts[e.id] || 0} intentos</span></div></div>
         <div class="row"><button class="sm sec" data-act="copylink" data-code="${esc(e.code)}">🔗 Copiar enlace</button>
         <button class="sm" data-act="edit" data-id="${e.id}">Editar</button>
@@ -388,7 +391,25 @@ const acts = {
     ed = { _new: true, title: '', code: Math.random().toString(36).slice(2, 7).toUpperCase(), minutes: 30, camera: true, shuffle: false, show_score: true, questions: [] };
     go('editor');
   },
-  edit: el => { ed = JSON.parse(JSON.stringify(cache.exams.find(e => e.id === el.dataset.id))); go('editor'); },
+  edit: async el => { ed = await fullExam(el.dataset.id); go('editor'); },
+  sendexams: () => {
+    const m = document.createElement('div'); m.className = 'modal small';
+    m.innerHTML = `<div class="card"><h3>Enviar exámenes a otro profesor</h3>
+      <p class="mut">Los exámenes elegidos (con sus intentos y resultados) se pasarán a la cuenta de ese correo y desaparecerán de la tuya. Debe tener una cuenta creada.</p>
+      <label>Correo del profesor</label><input id="sendto" type="email" autocomplete="off" placeholder="profesor@colegio.edu">
+      <label>Exámenes a enviar</label>
+      ${cache.exams.map(e => `<label class="chk"><input type="checkbox" class="sendchk" value="${e.id}" checked> ${esc(e.title)} <span class="mut">(${esc(e.code)})</span></label>`).join('')}
+      <div class="row" style="justify-content:flex-end;margin-top:1rem"><button class="ghost" data-act="closemodal">Cancelar</button><button data-act="dosend">Enviar</button></div></div>`;
+    document.body.appendChild(m); $('#sendto').focus();
+  },
+  dosend: async () => {
+    const email = $('#sendto').value.trim(), ids = [...document.querySelectorAll('.sendchk:checked')].map(c => c.value);
+    if (!/^\S+@\S+\.\S+$/.test(email)) return toast('Escribe un correo válido.', 'err');
+    if (!ids.length) return toast('Elige al menos un examen.', 'err');
+    if (!await ask(`¿Enviar ${ids.length} examen(es) a ${email}? Dejarán de estar en tu cuenta.`, 'Enviar')) return;
+    const r = await rpc('transfer_exams', { p_ids: ids, p_email: email });
+    $('.modal')?.remove(); toast(`${r.sent} examen(es) enviados a ${email}`, 'ok'); go('teacher');
+  },
   delexam: async el => {
     if (!await ask('¿Borrar el examen y todos sus resultados?', 'Borrar')) return;
     await q(sb.from('exams').delete().eq('id', el.dataset.id)); go('teacher');
@@ -397,8 +418,8 @@ const acts = {
     const url = location.origin + location.pathname + '#/examen/' + el.dataset.code;
     try { await navigator.clipboard.writeText(url); toast('Enlace copiado', 'ok'); } catch { prompt('Copia el enlace:', url); }
   },
-  exportexam: el => {
-    const { id, owner, created_at, rubric_id, ...x } = cache.exams.find(e => e.id === el.dataset.id);
+  exportexam: async el => {
+    const { id, owner, created_at, rubric_id, n_questions, ...x } = await fullExam(el.dataset.id);
     download('examen.json', JSON.stringify(x, null, 1), 'application/json');
   },
   importexam: () => $('#impfile').click(),
@@ -779,7 +800,7 @@ async function showDetail(id) {
   const [a, shots] = await Promise.all([
     q(sb.from('attempts').select('*').eq('id', id).single()),
     q(sb.from('shots').select('taken_at,img').eq('attempt_id', id).order('taken_at'))]);
-  const ex = cache.exams.find(e => e.id === a.exam_id);
+  const ex = await fullExam(a.exam_id).catch(() => null);
   const m = document.createElement('div'); m.className = 'modal';
   m.innerHTML = `<div class="card"><div class="row"><h3 class="grow">${esc(a.student_name)} — ${esc(ex?.title || '')}</h3><button class="sm sec" data-act="closemodal">Cerrar</button></div>
     <p>Nota: <b>${a.score ?? '—'}/${a.max_score ?? '—'}</b>${a.ended_at && a.max_score ? (p => ` (${p} %) · Nivel: <b>${esc(levelFor(p, ex?.levels).name)}</b>`)(Math.round(a.score / a.max_score * 100)) : ''} · Inicio: ${fdate(a.started_at)}${a.ended_at ? ' · Duración: ' + fmt(new Date(a.ended_at) - new Date(a.started_at)) : ''}</p>
