@@ -48,10 +48,16 @@ function download(name, data, type) {
   a.href = URL.createObjectURL(new Blob([data], { type }));
   a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
-async function rpc(fn, args) {
-  const { data, error } = await sb.rpc(fn, args);
-  if (error) throw new Error(error.message);
-  return data;
+/* Las llamadas repetibles del estudiante (guardar, alertas, fotos) se reintentan ante cortes de red o
+   saturación del servidor, con espera aleatoria para que no vuelvan a golpear todas a la vez. */
+const TRANSIENT = /failed to fetch|network|timeout|timed out|load failed|\b50[0234]\b|bad gateway|unavailable|too many|overload/i;
+async function rpc(fn, args, tries = /^student_(save|flag|shot)$/.test(fn) ? 3 : 1) {
+  for (let i = 1; ; i++) {
+    let res; try { res = await sb.rpc(fn, args); } catch (e) { res = { error: { message: String(e?.message || e) } }; }
+    if (!res.error) return res.data;
+    if (i >= tries || !TRANSIENT.test(res.error.message)) throw new Error(res.error.message);
+    await wait(700 * i + Math.random() * 700);
+  }
 }
 async function q(p) { const { data, error } = await p; if (error) throw error; return data; }
 
@@ -62,6 +68,7 @@ const loaders = {
       q(sb.from('exams').select(EXAM_COLS).order('created_at', { ascending: false })),
       q(sb.rpc('my_exam_counts'))]);
     cache.exams = exams;
+    rpc('purge_old_shots', { p_days: 60 }).catch(() => { }); // libera espacio: fotos de cámara de hace más de 60 días
     const counts = {}; att.forEach(a => counts[a.exam_id] = Number(a.n));
     return { exams, counts };
   },
@@ -584,12 +591,15 @@ document.addEventListener('input', e => {
   } else if (t.dataset.o !== undefined) ed.questions[+t.dataset.q].options[+t.dataset.o] = t.value;
   else if (t.dataset.qid && run) {
     run.at.answers[t.dataset.qid] = t.type === 'radio' ? +t.value : t.value;
-    run.dirty = true; markNav(); clearTimeout(run.saveT); run.saveT = setTimeout(saveAnswers, 700);
+    run.dirty = true; markNav(); clearTimeout(run.saveT);
+    run.saveT = setTimeout(saveAnswers, t.type === 'radio' ? 400 : 2500); // texto: espera a que deje de escribir
+    try { localStorage.setItem('ans:' + run.at.id, JSON.stringify(run.at.answers)); } catch { }
   }
 });
 document.addEventListener('change', async e => {
   const t = e.target;
   if (t.dataset.correct !== undefined) ed.questions[+t.dataset.q].correct = +t.dataset.correct;
+  if (t.dataset.qid && run?.dirty) saveAnswers(); // al salir de un campo de texto se guarda ya
   if (t.id === 'resfilter') go('results', t.value);
   if (t.dataset.rf === 'course') loadMine();
   if (t.dataset.afile !== undefined && t.files[0]) {
@@ -597,9 +607,9 @@ document.addEventListener('change', async e => {
     // Un .mpeg/.mpg suele venir como video/mpeg; el audio MPEG es el mismo formato que MP3 (audio/mpeg)
     const mpeg = /\.(mp3|mpeg|mpg|mpga)$/i.test(f.name) && (!f.type || /^(audio|video)\/mpeg$/.test(f.type));
     if (!f.type.startsWith('audio/') && !mpeg) { t.value = ''; return toast('Elige un archivo de audio.', 'err'); }
-    if (f.size > AUDIO_MAX) { t.value = ''; return toast('El audio pesa más de 1.5 MB. Comprímelo o usa un enlace.', 'err'); }
-    x.audio = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); });
-    if (!x.audio.startsWith('data:audio/')) x.audio = x.audio.replace(/^data:[^;,]*/, 'data:audio/mpeg');
+    if (f.size > AUDIO_MAX) { t.value = ''; return toast('El audio pesa más de 10 MB. Comprímelo o usa un enlace.', 'err'); }
+    toast('Subiendo audio…');
+    try { x.audio = await uploadAudio(f, mpeg); } catch (err) { t.value = ''; return toast(err.message, 'err'); }
     redraw('editor');
   }
   if (t.dataset.aurl !== undefined) {
@@ -735,7 +745,18 @@ async function reportPDF({ report: r, entries }) {
 }
 
 /* ---------- Pistas de audio ---------- */
-const AUDIO_MAX = 1.5 * 1024 * 1024;
+const AUDIO_MAX = 10 * 1024 * 1024, AUDIO_INLINE = 1.5 * 1024 * 1024;
+/* El audio se sube a Supabase Storage (CDN) y el examen guarda solo el enlace: así cada estudiante
+   no descarga MB de audio dentro de la base de datos al iniciar. Si falla la subida, se incrusta (≤1.5 MB). */
+async function uploadAudio(f, mpeg) {
+  const type = mpeg ? 'audio/mpeg' : f.type, ext = (f.name.match(/\.(\w{2,5})$/) || [])[1] || 'mp3';
+  const path = `${session.user.id}/${Date.now()}-${uid()}.${ext.toLowerCase()}`;
+  const { error } = await sb.storage.from('audios').upload(path, f, { contentType: type, cacheControl: '31536000' });
+  if (!error) return sb.storage.from('audios').getPublicUrl(path).data.publicUrl;
+  if (f.size > AUDIO_INLINE) throw new Error('No se pudo subir el audio (' + error.message + '). ¿Ejecutaste la sección de Storage de schema.sql?');
+  const url = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); });
+  return url.startsWith('data:audio/') ? url : url.replace(/^data:[^;,]*/, 'data:audio/mpeg');
+}
 function audioEditHTML(x, i) {
   if (x.audio) return `<div class="audbox"><label>Pista de audio</label>
     <audio controls preload="metadata" src="${esc(x.audio)}"></audio>
@@ -745,7 +766,7 @@ function audioEditHTML(x, i) {
   return `<div class="audbox"><label>Pista de audio (opcional)</label>
     <div class="row"><input type="file" accept="audio/*,.mp3,.mpeg,.mpga,.mpg" data-afile="${i}" style="flex:1">
       <input type="text" data-q="${i}" data-aurl placeholder="…o pega un enlace https:// a un .mp3" style="flex:1"></div>
-    <span class="mut">Archivo de hasta 1.5 MB (MP3 recomendado) o enlace directo.</span></div>`;
+    <span class="mut">Archivo de hasta 10 MB (MP3 recomendado) o enlace directo.</span></div>`;
 }
 function audioPlayHTML(x) {
   if (!x.audio) return '';
@@ -841,6 +862,8 @@ async function startFlow() {
   }
   let saved = {}; try { saved = JSON.parse(localStorage.getItem(tokKey(code, name)) || '{}'); } catch { }
   let r;
+  setMsg('Entrando al examen…');
+  await wait(Math.random() * 2500); // reparte la entrada cuando toda la clase pulsa a la vez
   try { r = await rpc('student_start', { p_code: code, p_name: name, p_token: saved.token || null }); }
   catch (e) { return setMsg(e.message, true); }
   if (r.expired) { stopStream(); return setMsg('Tu tiempo para este examen ya terminó.', true); }
@@ -852,8 +875,11 @@ function runExam(r) {
   const offset = new Date(r.now).getTime() - Date.now();
   const end = new Date(r.started_at).getTime() + r.minutes * 60000;
   const at = { id: r.attempt_id, token: r.token, order: r.order, answers: r.answers || {} };
+  let local = {}; try { local = JSON.parse(localStorage.getItem('ans:' + r.attempt_id) || '{}'); } catch { }
+  const unsynced = Object.keys(local).some(k => JSON.stringify(local[k]) !== JSON.stringify(at.answers[k]));
+  Object.assign(at.answers, local); // respaldo de este navegador: más reciente que el servidor si hubo un corte
   let plays = {}; try { plays = JSON.parse(localStorage.getItem('plays:' + r.attempt_id) || '{}'); } catch { }
-  run = { info: r, at, timers: [], handlers: [], dirty: false, last: {}, end, offset, plays };
+  run = { info: r, at, timers: [], handlers: [], dirty: unsynced, last: {}, end, offset, plays };
   render('exam');
   window.scrollTo(0, 0);
   if (stream && r.camera) {
@@ -864,8 +890,8 @@ function runExam(r) {
       c.getContext('2d').drawImage(v, 0, 0, 240, 180);
       rpc('student_shot', { p_attempt: at.id, p_token: at.token, p_img: c.toDataURL('image/jpeg', .5) }).catch(() => { });
     };
-    setTimeout(shoot, 1500);
-    run.timers.push(setInterval(shoot, 30000));
+    setTimeout(shoot, 1500 + Math.random() * 8000);
+    run.timers.push(setInterval(shoot, 60000));
     stream.getVideoTracks()[0].addEventListener('ended', () => flag('La cámara se desconectó o se apagó'));
   } else stopStream();
   const on = (t, ev, fn) => { t.addEventListener(ev, fn); run.handlers.push([t, ev, fn]); };
@@ -881,14 +907,20 @@ function runExam(r) {
     if (left <= 0 && !run.finishing) finishExam(true);
   };
   tick(); run.timers.push(setInterval(tick, 500));
-  run.timers.push(setInterval(() => run.dirty && saveAnswers(), 10000));
+  run.timers.push(setInterval(() => run.dirty && saveAnswers(), 8000));
   markNav();
 }
 async function saveAnswers() {
-  if (!run || run.finishing) return;
-  const st = $('#savestate'); run.dirty = false;
-  try { await rpc('student_save', { p_attempt: run.at.id, p_token: run.at.token, p_answers: run.at.answers }); if (st) st.textContent = '✓ Guardado'; }
-  catch (e) { run && (run.dirty = true); if (st) st.textContent = '⚠ Sin conexión, reintentando…'; }
+  if (!run || run.finishing || run.saving) return;
+  const st = $('#savestate'); run.saving = true; run.dirty = false;
+  try { await rpc('student_save', { p_attempt: run.at.id, p_token: run.at.token, p_answers: run.at.answers }); run.fails = 0; if (st) st.textContent = '✓ Guardado'; }
+  catch (e) {
+    if (!run) return;
+    if (/agotado|enviado|no válido/i.test(e.message)) { if (st) st.textContent = '⚠ ' + e.message; return; } // no se arregla reintentando
+    run.dirty = true; run.fails = (run.fails || 0) + 1; clearTimeout(run.retryT);
+    run.retryT = setTimeout(saveAnswers, Math.min(30000, 2000 * 2 ** run.fails) + Math.random() * 1000); // espera creciente + aleatoria
+    if (st) st.textContent = '⚠ Sin conexión, reintentando…';
+  } finally { if (run) run.saving = false; }
 }
 function flag(msg) {
   if (!run || run.finishing) return;
@@ -903,7 +935,7 @@ function markNav() {
 }
 function cleanupRun() {
   if (!run) return;
-  run.timers.forEach(clearInterval); clearTimeout(run.saveT);
+  run.timers.forEach(clearInterval); clearTimeout(run.saveT); clearTimeout(run.retryT);
   run.handlers.forEach(([t, ev, fn]) => t.removeEventListener(ev, fn));
   run = null; stopStream();
 }
@@ -915,6 +947,7 @@ async function finishExam(auto) {
   for (; ;) {
     try {
       const r = await rpc('student_submit', { p_attempt: at.id, p_token: at.token, p_answers: at.answers });
+      try { localStorage.removeItem('ans:' + at.id); } catch { }
       cleanupRun();
       render('done', { show: r.show, score: r.score, max: r.max, levels: r.levels, auto });
       return;

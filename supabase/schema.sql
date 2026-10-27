@@ -197,7 +197,7 @@ declare a public.attempts;
 begin
   a := public._attempt(p_attempt, p_token);
   if a.ended_at is not null or length(p_img) > 80000 then return; end if;
-  if (select count(*) from public.shots where attempt_id = a.id) >= 60 then return; end if;
+  if (select count(*) from public.shots where attempt_id = a.id) >= 30 then return; end if;
   insert into public.shots (attempt_id, img) values (a.id, p_img);
 end $$;
 
@@ -394,3 +394,32 @@ begin
 end $$;
 revoke all on function public.transfer_exams(uuid[], text) from public, anon;
 grant execute on function public.transfer_exams(uuid[], text) to authenticated;
+
+
+-- ---------- Audios en Storage (CDN) y limpieza de fotos ----------
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('audios', 'audios', true, 10485760,
+  array['audio/mpeg','audio/mp3','audio/wav','audio/x-wav','audio/ogg','audio/aac','audio/mp4','audio/x-m4a','audio/webm'])
+on conflict (id) do update set public = true, file_size_limit = 10485760, allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists audios_upload on storage.objects;
+create policy audios_upload on storage.objects for insert to authenticated
+  with check (bucket_id = 'audios' and (storage.foldername(name))[1] = auth.uid()::text);
+drop policy if exists audios_delete on storage.objects;
+create policy audios_delete on storage.objects for delete to authenticated
+  using (bucket_id = 'audios' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- Borra las fotos de cámara con más de p_days días de los exámenes del profesor (conserva notas y alertas).
+create or replace function public.purge_old_shots(p_days int default 60) returns int
+language plpgsql security definer set search_path = public as $$
+declare n int;
+begin
+  if auth.uid() is null then return 0; end if;
+  delete from public.shots s using public.attempts a, public.exams e
+   where s.attempt_id = a.id and a.exam_id = e.id and e.owner = auth.uid()
+     and s.taken_at < now() - make_interval(days => greatest(p_days, 7));
+  get diagnostics n = row_count;
+  return n;
+end $$;
+revoke all on function public.purge_old_shots(int) from public, anon;
+grant execute on function public.purge_old_shots(int) to authenticated;
