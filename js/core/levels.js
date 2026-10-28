@@ -9,4 +9,4 @@ export const LEVELS = [
   { min: 0, range: 'Menos de 35 %', name: 'Bajo', cls: 'bad', text: 'El estudiante presenta un desempeño reducido en las tareas cognitivas evaluadas. Puede requerir acompañamiento pedagógico, estrategias de aprendizaje diferenciadas y una revisión de los factores que pudieron influir en sus resultados, para determinar qué apoyos necesita.' }
 ];
 /* `levels` es la rúbrica del examen (de mayor a menor 'min'); null = escala predeterminada */
-export const levelFor = (pct, levels) => { const L = levels?.length ? levels : LEVELS; return L.find(l => pct >= l.min) || L[L.length - 1]; };
+export const levelFor = (pct, levels) => { const L = levels || LEVELS; return L.find(l => pct >= l.min) || L[L.length - 1]; };
