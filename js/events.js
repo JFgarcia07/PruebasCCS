@@ -3,7 +3,7 @@ import { go } from './core/router.js';
 import { state } from './core/state.js';
 import { onAudioFile, onAudioUrl } from './features/audio.js';
 import { onImportFile } from './features/exams.js';
-import { loadMineCv, onCoevalInput } from './features/coeval.js';
+import { onCoevalInput, onCoevFilter } from './features/coeval.js';
 import { ivToggle, onInterviewChange } from './features/interviews.js';
 import { loadMine } from './features/reports.js';
 import { critTotal, onRubricKind } from './features/rubrics.js';
@@ -11,7 +11,8 @@ import { markNav, saveAnswers } from './features/student.js';
 
 document.addEventListener('input', e => {
   const t = e.target;
-  if (t.dataset.cve || t.dataset.cvf || t.dataset.cvk) onCoevalInput(t);
+  if (t.id === 'cvq' || t.id === 'cvfilter') onCoevFilter();
+  else if (t.dataset.cvf || t.dataset.cvk) onCoevalInput(t);
   else if (t.dataset.rp) state.rp[t.dataset.rp] = t.value;
   else if (t.dataset.rf) state.rf[t.dataset.rf] = t.value;
   else if (t.dataset.cf) {
@@ -44,7 +45,6 @@ document.addEventListener('change', async e => {
   if (t.dataset.rb === 'kind') return onRubricKind();
   if (t.id === 'resfilter') go('results', t.value);
   if (t.dataset.rf === 'course') loadMine();
-  if (t.dataset.cvf === 'course') loadMineCv();
   if (t.dataset.afile !== undefined && t.files[0]) return onAudioFile(t);
   if (t.dataset.aurl !== undefined) return onAudioUrl(t);
   if (t.id === 'impfile' && t.files[0]) return onImportFile(t);

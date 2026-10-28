@@ -3,26 +3,24 @@ import { EXAM_COLS, fullExam, q, rpc } from '../core/api.js';
 import { sb } from '../core/config.js';
 import { levelFor } from '../core/levels.js';
 import { go } from '../core/router.js';
-import { cvButtons } from './coeval.js';
 import { isAdmin, state } from '../core/state.js';
 import { ask, download, toast } from '../core/ui.js';
 import { $, esc, fdate, fmt, norm } from '../core/util.js';
 
 export const loaders = {
   async results(examId) {
-    const [exams, attempts, owners, cvmap] = await Promise.all([
+    const [exams, attempts, owners] = await Promise.all([
       q(sb.from('exams').select(EXAM_COLS).order('created_at', { ascending: false })),
       q(sb.from('attempts').select('id,exam_id,student_name,email,started_at,ended_at,score,score_auto,score_edited_at,max_score,flags').order('started_at', { ascending: false })),
       // la administración ve los exámenes de todos y necesita saber de quién es cada uno
-      isAdmin() ? q(sb.from('profiles').select('id,email')).then(r => Object.fromEntries(r.map(p => [p.id, p.email]))) : {},
-      isAdmin() ? q(sb.from('coevals').select('id,attempt_id,code').not('attempt_id', 'is', null)).then(r => Object.fromEntries(r.map(c => [c.attempt_id, c]))) : {}]);
-    state.cache.exams = exams; state.cache.attempts = attempts;
-    return { exams, attempts: attempts.filter(a => !examId || a.exam_id === examId), examId, owners, cvmap };
+      isAdmin() ? q(sb.from('profiles').select('id,email')).then(r => Object.fromEntries(r.map(p => [p.id, p.email]))) : {}]);
+    state.cache.exams = exams;
+    return { exams, attempts: attempts.filter(a => !examId || a.exam_id === examId), examId, owners };
   }
 };
 
 export const views = {
-  results: ({ exams, attempts, examId, owners, cvmap }) => {
+  results: ({ exams, attempts, examId, owners }) => {
     const admin = isAdmin();
     const done = attempts.filter(a => a.ended_at && a.max_score);
     const avg = done.length ? Math.round(done.reduce((s, a) => s + a.score / a.max_score, 0) / done.length * 100) : null;
@@ -44,7 +42,7 @@ export const views = {
       <td>${a.ended_at && a.max_score ? (l => `<span class="tag ${esc(l.cls)}">${esc(l.name)}</span>`)(levelFor(Math.round(a.score / a.max_score * 100), ex?.levels)) : '<span class="mut">—</span>'}</td><td>${fdate(a.started_at)}</td>
       <td>${a.flags.length ? `<span class="tag bad">${a.flags.length}</span>` : '<span class="mut">—</span>'}</td>
       <td class="row"><button class="sm sec" data-act="detail" data-id="${a.id}">Ver</button>
-      ${admin ? cvButtons(a, cvmap) : ''}<button class="sm danger" data-act="delatt" data-id="${a.id}">✕</button></td></tr>`;
+      <button class="sm danger" data-act="delatt" data-id="${a.id}">✕</button></td></tr>`;
     }).join('')}</tbody></table>` : '<div class="empty"><div class="ic">📭</div>Sin intentos todavía.</div>'}</div>`;
   }
 };

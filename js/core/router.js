@@ -14,8 +14,8 @@ export async function go(view, p) {
   const my = ++state.gen;
   try {
     if (!sb && view !== 'home') view = 'setup';
-    if (['teacher', 'results', 'editor', 'rubrics', 'rubedit', 'reports', 'repedit', 'repview', 'interviews', 'coevals', 'coevedit', 'coevview'].includes(view) && !state.session) view = 'auth';
-    if (['interviews', 'coevals', 'coevedit', 'coevview'].includes(view) && !isAdmin()) view = 'teacher'; // entrevistas y coevaluación: administración
+    if (['teacher', 'results', 'editor', 'rubrics', 'rubedit', 'reports', 'repedit', 'repview', 'interviews', 'coevals', 'coevfill'].includes(view) && !state.session) view = 'auth';
+    if (['interviews', 'coevals', 'coevfill'].includes(view) && !isAdmin()) view = 'teacher'; // entrevistas y coevaluación: administración
     let data = p;
     if (registry.loaders[view]) { app.innerHTML = '<div class="loading">Cargando…</div>'; data = await registry.loaders[view](p); }
     if (my !== state.gen) return;
@@ -31,9 +31,8 @@ export function nav() {
 }
 export function render(view, p) { nav(); app.innerHTML = registry.views[view](p); }
 export function route() {
-  const m = location.hash.match(/^#\/examen\/(.+)$/), rm = location.hash.match(/^#\/reporte\/(.+)$/), cm = location.hash.match(/^#\/coevaluacion\/(.+)$/);
+  const m = location.hash.match(/^#\/examen\/(.+)$/), rm = location.hash.match(/^#\/reporte\/(.+)$/);
   if (m) go('join', { code: decodeURIComponent(m[1]).toUpperCase() });
   else if (rm) go('repform', { code: decodeURIComponent(rm[1]).toUpperCase() });
-  else if (cm) go('coevform', { code: decodeURIComponent(cm[1]).toUpperCase() });
   else if (!state.run) go('home');
 }
