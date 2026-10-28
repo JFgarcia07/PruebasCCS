@@ -56,7 +56,8 @@ Módulos ES nativos: no hay paso de compilación; Live Server, Netlify o Cloudfl
 - Entrevistas: siempre llevan entrevistado y entrevistador. Alumno: nombre, grado, edad y encargado. Padre/madre: nombre, hijo/a, edad y correo.
 
 ## Coevaluación docente (solo administración)
-- Menú **Coevaluación**: la administración crea la coevaluación de un estudiante y comparte el enlace `#/coevaluacion/CÓDIGO`. Cada docente (sin cuenta) elige su curso y califica de 1 a 4 los 12 criterios de la rúbrica por defecto: *Comportamiento* (6 criterios, 10 pts) y *Académico* (6 criterios, 10 pts). Puntos de cada sección = suma de niveles ÷ máximo × 10.
+- En **Resultados**, el botón *🤝 Coevaluación* de cada estudiante que ya presentó examen crea su coevaluación (y copia el enlace); en el menú **Coevaluación** se ven todas. La administración comparte el enlace `#/coevaluacion/CÓDIGO`. Cada docente (sin cuenta) elige su curso y califica de 1 a 4 los 12 criterios de la rúbrica por defecto: *Comportamiento* (6 criterios, 10 pts) y *Académico* (6 criterios, 10 pts). Puntos de cada sección = suma de niveles ÷ máximo × 10.
 - La administración ve por cada coevaluación: promedios, cursos pendientes, notas por docente, una matriz criterio × docente con colores y los comentarios. No genera PDF.
-- Cada coevaluación guarda una copia de la rúbrica (ubric), definida en `js/core/coeval-rubric.js`.
+- Cada coevaluación guarda una copia de la rúbrica (
+ubric), definida en `js/core/coeval-rubric.js`.
 

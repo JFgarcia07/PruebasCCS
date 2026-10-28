@@ -1,5 +1,6 @@
-/* Coevaluación docente: la administración crea una coevaluación de un estudiante y comparte el enlace; cada docente
-   (sin cuenta) elige su curso y califica los criterios de la rúbrica. La administración ve todo lo recopilado. */
+/* Coevaluación docente: desde Resultados, la administración envía la coevaluación de un estudiante que ya presentó examen
+   y comparte el enlace; cada docente (sin cuenta) elige su curso y califica los criterios de la rúbrica.
+   La administración ve todo lo recopilado. */
 import { q, rpc } from '../core/api.js';
 import { sb } from '../core/config.js';
 import { cvKey, cvScore, cvTotalCriteria, DEFAULT_COEVAL } from '../core/coeval-rubric.js';
@@ -15,7 +16,7 @@ const num = v => v === null ? '—' : v;
 export const loaders = {
   async coevals() {
     const [list, ents] = await Promise.all([
-      q(sb.from('coevals').select('id,title,student_name,grade_level,period,code,courses,created_at').order('created_at', { ascending: false })),
+      q(sb.from('coevals').select('id,title,student_name,student_email,exam_title,grade_level,period,code,courses,created_at').order('created_at', { ascending: false })),
       q(sb.from('coeval_entries').select('coeval_id'))]);
     state.cache.coevals = list;
     const counts = {}; ents.forEach(e => counts[e.coeval_id] = (counts[e.coeval_id] || 0) + 1);
@@ -38,22 +39,22 @@ export const loaders = {
 export const views = {
   coevals: ({ list, counts }) => `
     <div class="row" style="margin-bottom:1rem"><h2 class="grow" style="margin:0">Coevaluación docente</h2>
-      <button data-act="newcoeval">＋ Enviar coevaluación</button></div>
-    <p class="mut">Crea la coevaluación de un estudiante y comparte el enlace con sus docentes: cada uno elige su curso y califica los criterios de la rúbrica (comportamiento y académico). Aquí ves todo lo recopilado.</p>
+      <button class="sec" data-act="results">Ir a Resultados</button></div>
+    <p class="mut">Las coevaluaciones se envían desde <b>Resultados</b>, con el botón “🤝 Coevaluación” de cada estudiante que ya presentó examen. Aquí ves todo lo que respondieron los docentes.</p>
     ${list.length ? list.map(c => `<div class="card ex-card"><div class="grow"><h3 style="margin-bottom:.2rem">${esc(c.title)}</h3>
-        <div class="tags"><span class="tag">👤 ${esc(c.student_name)}</span>${c.grade_level ? `<span class="tag">${esc(c.grade_level)}</span>` : ''}${c.period ? `<span class="tag">${esc(c.period)}</span>` : ''}
+        <div class="tags"><span class="tag">👤 ${esc(c.student_name)}</span>${c.exam_title ? `<span class="tag">📝 ${esc(c.exam_title)}</span>` : ''}${c.grade_level ? `<span class="tag">${esc(c.grade_level)}</span>` : ''}${c.period ? `<span class="tag">${esc(c.period)}</span>` : ''}
         <span class="tag">Código <span class="code">${esc(c.code)}</span></span>
         <span class="tag ok">${counts[c.id] || 0}${c.courses.length ? ' / ' + c.courses.length : ''} docentes respondieron</span></div></div>
         <div class="row"><button class="sm sec" data-act="copycvlink" data-code="${esc(c.code)}">🔗 Copiar enlace</button>
         <button class="sm" data-act="coevview" data-id="${c.id}">Resultados</button>
         <button class="sm sec" data-act="editcoeval" data-id="${c.id}">Editar</button>
         <button class="sm danger" data-act="delcoeval" data-id="${c.id}">Borrar</button></div></div>`).join('')
-      : '<div class="card empty"><div class="ic">🤝</div><p>Aún no has enviado coevaluaciones.</p><button data-act="newcoeval">Crear la primera</button></div>'}`,
+      : '<div class="card empty"><div class="ic">🤝</div><p>Aún no has enviado coevaluaciones.</p><button data-act="results">Ir a Resultados</button></div>'}`,
 
   coevedit: () => {
     const c = state.cv;
     return `
-    <div class="row" style="margin-bottom:1rem"><h2 class="grow" style="margin:0">${c._new ? 'Nueva coevaluación' : 'Editar coevaluación'}</h2>
+    <div class="row" style="margin-bottom:1rem"><h2 class="grow" style="margin:0">Editar coevaluación</h2>
       <button class="ghost" data-act="coevals">Cancelar</button><button data-act="savecoeval">Guardar</button></div>
     <div class="card"><div class="grid">
       <div><label>Título</label><input data-cve="title" value="${esc(c.title)}" placeholder="Ej. Coevaluación de la unidad 3"></div>
@@ -84,7 +85,7 @@ export const views = {
     <div class="row" style="margin-bottom:1rem"><h2 class="grow" style="margin:0">${esc(cv.title)}</h2>
       <button class="ghost" data-act="coevals">← Coevaluaciones</button>
       <button class="sec" data-act="copycvlink" data-code="${esc(cv.code)}">🔗 Copiar enlace</button></div>
-    <div class="card"><div class="tags" style="margin:0"><span class="tag">👤 ${esc(cv.student_name)}</span>${cv.grade_level ? `<span class="tag">${esc(cv.grade_level)}</span>` : ''}${cv.period ? `<span class="tag">${esc(cv.period)}</span>` : ''}
+    <div class="card"><div class="tags" style="margin:0"><span class="tag">👤 ${esc(cv.student_name)}</span>${cv.student_email ? `<span class="tag">${esc(cv.student_email)}</span>` : ''}${cv.exam_title ? `<span class="tag">📝 ${esc(cv.exam_title)}</span>` : ''}${cv.grade_level ? `<span class="tag">${esc(cv.grade_level)}</span>` : ''}${cv.period ? `<span class="tag">${esc(cv.period)}</span>` : ''}
       <span class="tag">Código <span class="code">${esc(cv.code)}</span></span></div></div>
     <div class="stats"><div class="stat"><b>${entries.length}${cv.courses.length ? ' / ' + cv.courses.length : ''}</b><span>Docentes respondieron</span></div>
       ${R.sections.map((s, i) => `<div class="stat"><b>${num(partAvg(i))}</b><span>${esc(s.name)} (promedio de ${s.points})</span></div>`).join('')}
@@ -110,7 +111,7 @@ export const views = {
     return `
     <div class="card" style="max-width:980px;margin:1rem auto"><div style="text-align:center"><img class="logo-sm" src="logo.webp" alt="Calvary Christian School"></div>
       <h2 style="text-align:center">${esc(i.title)}</h2>
-      <div class="tags" style="justify-content:center"><span class="tag">👤 ${esc(i.student_name)}</span>${i.grade_level ? `<span class="tag">${esc(i.grade_level)}</span>` : ''}${i.period ? `<span class="tag">${esc(i.period)}</span>` : ''}</div>
+      <div class="tags" style="justify-content:center"><span class="tag">👤 ${esc(i.student_name)}</span>${i.exam_title ? `<span class="tag">📝 ${esc(i.exam_title)}</span>` : ''}${i.grade_level ? `<span class="tag">${esc(i.grade_level)}</span>` : ''}${i.period ? `<span class="tag">${esc(i.period)}</span>` : ''}</div>
       <div class="grid"><div><label>Tu nombre</label><input data-cvf="teacher" value="${esc(f.teacher)}" autocomplete="name"></div>
         <div><label>Curso que impartes</label>${i.courses.length ? `<select data-cvf="course"><option value="">Selecciona…</option>
           ${i.courses.map(c => `<option value="${esc(c)}" ${norm(c) === norm(f.course) ? 'selected' : ''}>${esc(c)}${i.filled.some(x => norm(x) === norm(c)) ? ' (ya registrado)' : ''}</option>`).join('')}</select>`
@@ -160,11 +161,45 @@ export async function loadMineCv() {
   redraw('coevform');
 }
 
+/* Botones de coevaluación de una fila de Resultados: crear, o ver/copiar enlace si ya existe */
+export const cvButtons = (a, cvmap) => cvmap[a.id]
+  ? `<button class="sm sec" data-act="coevview" data-id="${cvmap[a.id].id}" title="Ver la coevaluación docente">🤝 Ver</button><button class="sm ghost" data-act="copycvlink" data-code="${esc(cvmap[a.id].code)}" title="Copiar enlace para los docentes">🔗</button>`
+  : a.ended_at ? `<button class="sm sec" data-act="cvnew" data-id="${a.id}">🤝 Coevaluación</button>` : '';
+
 export const acts = {
   coevals: () => go('coevals'),
-  newcoeval: () => {
-    state.cv = { _new: true, title: '', student_name: '', grade_level: '', period: '', code: Math.random().toString(36).slice(2, 8).toUpperCase(), coursesTxt: '' };
-    go('coevedit');
+  /* Desde Resultados: pide los datos opcionales y crea la coevaluación del estudiante con la rúbrica por defecto */
+  cvnew: el => {
+    const a = state.cache.attempts.find(x => x.id === el.dataset.id), ex = state.cache.exams.find(e => e.id === a.exam_id);
+    const m = document.createElement('div'); m.className = 'modal small';
+    m.innerHTML = `<div class="card"><h3>Enviar coevaluación docente</h3>
+      <p><b>${esc(a.student_name)}</b><br><span class="mut">${esc(ex?.title || '')}${a.email ? ' · ' + esc(a.email) : ''}</span></p>
+      <label>Grado / sección (opcional)</label><input id="cvgrade" placeholder="Ej. 5.º primaria B">
+      <label>Período (opcional)</label><input id="cvperiod" placeholder="Ej. Unidad 3 · 2026">
+      <label>Cursos (opcional, uno por línea)</label><textarea id="cvcourses" placeholder="Matemática&#10;Comunicación y Lenguaje"></textarea>
+      <span class="mut">Con cursos, cada docente elige el suyo y verás cuáles faltan. Sin cursos, cada docente escribe el suyo.</span>
+      <div class="row" style="justify-content:flex-end;margin-top:1rem"><button class="ghost" data-act="closemodal">Cancelar</button>
+      <button data-act="docvnew" data-id="${esc(a.id)}">Crear y copiar enlace</button></div></div>`;
+    document.body.appendChild(m);
+  },
+  docvnew: async el => {
+    const a = state.cache.attempts.find(x => x.id === el.dataset.id), ex = state.cache.exams.find(e => e.id === a.exam_id);
+    const courses = [...new Map($('#cvcourses').value.split(/\r?\n/).map(s => s.trim()).filter(Boolean).map(s => [norm(s), s])).values()];
+    const row = { attempt_id: a.id, title: 'Coevaluación docente' + (ex ? ' · ' + ex.title : ''), student_name: a.student_name, student_email: a.email || null,
+      exam_title: ex?.title || '', grade_level: $('#cvgrade').value.trim(), period: $('#cvperiod').value.trim(), courses, rubric: DEFAULT_COEVAL };
+    let code;
+    for (let i = 0; ; i++) {
+      code = Math.random().toString(36).slice(2, 8).toUpperCase();
+      const { error } = await sb.from('coevals').insert({ ...row, code });
+      if (!error) break;
+      if (error.code === '23505' && /attempt/.test(error.message)) throw new Error('Este estudiante ya tiene una coevaluación.');
+      if (error.code !== '23505' || i > 5) throw error;   // código repetido: se vuelve a intentar con otro
+    }
+    $('.modal')?.remove();
+    const url = location.origin + location.pathname + '#/coevaluacion/' + code;
+    try { await navigator.clipboard.writeText(url); toast('Coevaluación creada. Enlace copiado: envíalo a los docentes.', 'ok'); }
+    catch { prompt('Coevaluación creada. Copia el enlace:', url); }
+    go('results', $('#resfilter')?.value || '');
   },
   editcoeval: el => {
     const c = JSON.parse(JSON.stringify(state.cache.coevals.find(x => x.id === el.dataset.id)));
@@ -179,7 +214,7 @@ export const acts = {
     const courses = [...new Map(c.coursesTxt.split(/\r?\n/).map(s => s.trim()).filter(Boolean).map(s => [norm(s), s])).values()];
     const row = { title, student_name: student, grade_level: c.grade_level.trim(), period: c.period.trim(), code, courses };
     try {
-      await q(c._new ? sb.from('coevals').insert({ ...row, rubric: DEFAULT_COEVAL }) : sb.from('coevals').update(row).eq('id', c.id));
+      await q(sb.from('coevals').update(row).eq('id', c.id));
     } catch (e) { throw new Error(e.code === '23505' ? 'Ya existe otra coevaluación con ese código.' : e.message); }
     toast('Coevaluación guardada. Copia el enlace y envíalo a los docentes.', 'ok'); go('coevals');
   },

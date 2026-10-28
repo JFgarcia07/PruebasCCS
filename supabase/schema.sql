@@ -614,6 +614,11 @@ create table if not exists public.coeval_entries (
   unique (coeval_id, course_key)
 );
 create index if not exists coevals_created_idx on public.coevals(created_at desc);
+-- Se crean desde Resultados: una coevaluación por intento de examen (se conserva aunque se borre el intento).
+alter table public.coevals add column if not exists attempt_id uuid references public.attempts(id) on delete set null;
+alter table public.coevals add column if not exists student_email text;
+alter table public.coevals add column if not exists exam_title text;
+create unique index if not exists coevals_attempt_uq on public.coevals(attempt_id) where attempt_id is not null;
 
 alter table public.coevals enable row level security;
 alter table public.coeval_entries enable row level security;
@@ -631,7 +636,7 @@ begin
   select * into c from public.coevals where code = upper(btrim(p_code));
   if not found then raise exception 'Coevaluación no encontrada'; end if;
   return jsonb_build_object('title', c.title, 'student_name', c.student_name, 'grade_level', c.grade_level,
-    'period', c.period, 'courses', c.courses, 'rubric', c.rubric,
+    'period', c.period, 'courses', c.courses, 'rubric', c.rubric, 'exam_title', coalesce(c.exam_title, ''),
     'filled', (select coalesce(jsonb_agg(course), '[]') from public.coeval_entries where coeval_id = c.id));
 end $$;
 
