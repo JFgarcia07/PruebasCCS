@@ -1,265 +1,145 @@
-/* Reportes de estudiante: creación, formulario para docentes, resultados y PDF. */
-import { q, rpc } from '../core/api.js';
+/* Reportes automáticos (solo administración): de cada estudiante se suman todos sus exámenes, sus entrevistas y su coevaluación.
+   La rúbrica de tipo reporte interpreta el total; la nota se puede ajustar a mano y el informe se descarga en PDF. */
+import { q } from '../core/api.js';
 import { sb } from '../core/config.js';
-import { levelFor } from '../core/levels.js';
-import { go, redraw, render } from '../core/router.js';
+import { buildStudents, summarize } from '../core/report-calc.js';
+import { reportPDF } from '../core/report-pdf.js';
+import { go, render } from '../core/router.js';
 import { state } from '../core/state.js';
 import { ask, toast } from '../core/ui.js';
-import { esc, fdate, norm } from '../core/util.js';
+import { $, esc, fdate, norm } from '../core/util.js';
+
+const fmtD = d => fdate(d).split(',')[0];
+const levels = () => state.rep.rubrics.find(r => r.id === state.rep.rubricId)?.levels || null;
+const rubricName = () => state.rep.rubrics.find(r => r.id === state.rep.rubricId)?.name || '';
+const student = key => state.rep.students.find(s => s.key === key);
+const lvTag = l => l ? `<span class="tag ${esc(l.cls)}">${esc(l.name)}</span>` : '<span class="mut">—</span>';
+const pctTxt = (a, b) => b ? Math.round(a / b * 100) + ' %' : '—';
 
 export const loaders = {
-  async repedit() { state.cache.rubrics = await q(sb.from('rubrics').select('id,name,kind,levels').in('kind', ['exam', 'report']).order('name')); },
+  /* Una sola carga con columnas mínimas; los totales se calculan aquí (en el navegador) */
   async reports() {
-    const [reports, ents] = await Promise.all([
-      q(sb.from('reports').select('*').order('created_at', { ascending: false })),
-      q(sb.from('report_entries').select('report_id'))]);
-    state.cache.reports = reports;
-    const counts = {}; ents.forEach(e => counts[e.report_id] = (counts[e.report_id] || 0) + 1);
-    return { reports, counts };
-  },
-  async repview(id) {
-    const [report, entries] = await Promise.all([
-      q(sb.from('reports').select('*').eq('id', id).single()),
-      q(sb.from('report_entries').select('*').eq('report_id', id).order('course'))]);
-    return { report, entries };
-  },
-  async repform({ code }) {
-    const info = await rpc('report_info', { p_code: code });
-    let teacher = ''; try { teacher = localStorage.getItem('rep:teacher') || ''; } catch { }
-    state.rf = { code, info, course: '', teacher, score: '', comment: '', token: null };
-    return state.rf;
+    const [attempts, exams, interviews, rubs, evals, overrides] = await Promise.all([
+      q(sb.from('attempts').select('exam_id,student_name,email,ended_at,score,max_score,score_edited_at').order('started_at', { ascending: false })),
+      q(sb.from('exams').select('id,title')),
+      q(sb.from('interviews').select('rubric_id,subject_name,subject_type,child_name,interviewer,scores,created_at')),
+      q(sb.from('rubrics').select('id,name,kind,criteria,levels').in('kind', ['interview', 'report']).order('name')),
+      q(sb.from('coevaluations').select('student_key,scores,comment,updated_at')),
+      q(sb.from('report_overrides').select('*'))]);
+    const reportRubrics = rubs.filter(r => r.kind === 'report');
+    let saved = ''; try { saved = localStorage.getItem('rep:rubric') || ''; } catch { }
+    state.rep = { students: buildStudents({ attempts, exams, interviews, rubrics: rubs.filter(r => r.kind === 'interview'), evals, overrides }),
+      rubrics: reportRubrics, rubricId: reportRubrics.some(r => r.id === saved) ? saved : '' };
+    return state.rep;
   }
+};
+
+const rowHTML = s => {
+  const m = summarize(s, levels());
+  return `<tr data-find="${esc(norm(s.name + ' ' + s.email))}">
+    <td><b>${esc(s.name)}</b>${s.email ? `<br><span class="mut">${esc(s.email)}</span>` : ''}</td>
+    <td>${s.exams.length}</td><td>${s.interviews.length}</td><td>${s.coeval ? '✔' : '<span class="mut">—</span>'}</td>
+    <td style="white-space:nowrap">${m.empty ? '<span class="mut">—</span>' : `<b>${m.total}</b> / ${m.max}${m.adjusted ? ' <span class="tag warn" title="Nota ajustada a mano">ajustada</span>' : ''}`}</td>
+    <td>${m.empty ? '' : m.pct + ' %'}</td><td>${m.empty ? '' : lvTag(m.level)}</td>
+    <td class="row"><button class="sm" data-act="repstudent" data-key="${esc(s.key)}">Ver</button>
+      <button class="sm sec" data-act="reppdf" data-key="${esc(s.key)}" ${m.empty ? 'disabled' : ''} title="Descargar PDF">⬇ PDF</button></td></tr>`;
 };
 
 export const views = {
-  reports: ({ reports, counts }) => `
+  reports: () => {
+    const { students, rubrics, rubricId } = state.rep, ms = students.map(s => summarize(s, levels()));
+    const withData = ms.filter(m => !m.empty), avg = withData.length ? Math.round(withData.reduce((a, m) => a + m.pct, 0) / withData.length) : null;
+    return `
     <div class="row" style="margin-bottom:1rem"><h2 class="grow" style="margin:0">Reportes de estudiantes</h2>
-      <button data-act="newreport">＋ Nuevo reporte</button></div>
-    <p class="mut">Crea el reporte de un estudiante y comparte el enlace con sus docentes: cada uno elige su curso y deja la nota de la unidad y un comentario. Aquí ves todo lo recopilado y descargas el PDF.</p>
-    ${reports.length ? reports.map(r => `<div class="card ex-card"><div class="grow"><h3 style="margin-bottom:.2rem">${esc(r.title)}</h3>
-        <div class="tags"><span class="tag">👤 ${esc(r.student_name)}</span>${r.grade_level ? `<span class="tag">${esc(r.grade_level)}</span>` : ''}${r.period ? `<span class="tag">${esc(r.period)}</span>` : ''}
-        <span class="tag">Código <span class="code">${esc(r.code)}</span></span>
-        <span class="tag ok">${counts[r.id] || 0}${r.courses.length ? ' / ' + r.courses.length : ''} cursos registrados</span>${r.levels ? '<span class="tag warn">🏅 con rúbrica</span>' : ''}</div></div>
-        <div class="row"><button class="sm sec" data-act="copyreplink" data-code="${esc(r.code)}">🔗 Copiar enlace</button>
-        <button class="sm" data-act="repview" data-id="${r.id}">Resultados</button>
-        <button class="sm sec" data-act="editreport" data-id="${r.id}">Editar</button>
-        <button class="sm danger" data-act="delreport" data-id="${r.id}">Borrar</button></div></div>`).join('')
-      : '<div class="card empty"><div class="ic">📝</div><p>Aún no tienes reportes.</p><button data-act="newreport">Crear el primero</button></div>'}`,
-  repedit: () => {
-    const r = state.rp;
-    return `
-    <div class="row" style="margin-bottom:1rem"><h2 class="grow" style="margin:0">${r._new ? 'Nuevo reporte' : 'Editar reporte'}</h2>
-      <button class="ghost" data-act="reports">Cancelar</button><button data-act="savereport">Guardar reporte</button></div>
-    <div class="card"><div class="grid">
-      <div><label>Título del reporte</label><input data-rp="title" value="${esc(r.title)}" placeholder="Ej. Informe de la unidad 3"></div>
-      <div><label>Nombre del estudiante</label><input data-rp="student_name" value="${esc(r.student_name)}"></div>
-      <div><label>Grado / sección (opcional)</label><input data-rp="grade_level" value="${esc(r.grade_level)}" placeholder="Ej. 5.º primaria B"></div>
-      <div><label>Período (opcional)</label><input data-rp="period" value="${esc(r.period)}" placeholder="Ej. Unidad 3 · 2026"></div>
-      <div><label>Código del enlace</label><input data-rp="code" value="${esc(r.code)}"></div>
-      <div><label>Nota máxima de la unidad</label><input data-rp="max_score" type="number" min="1" step="any" value="${esc(r.max_score)}" ${r._new ? '' : 'disabled title="No se puede cambiar una vez creado"'}></div></div>
-      <label>Cursos (opcional, uno por línea)</label>
-      <textarea data-rp="coursesTxt" placeholder="Matemática&#10;Comunicación y Lenguaje&#10;Ciencias Naturales">${esc(r.coursesTxt)}</textarea>
-      <span class="mut">Si los escribes, cada docente elegirá su curso de esta lista (y verás cuáles faltan). Si lo dejas vacío, cada docente escribe el nombre de su curso.</span>
-      <label>Rúbrica (opcional, se aplica al porcentaje de cada nota)</label>
-      <select data-rp="rubric_id"><option value="">Sin rúbrica</option>
-        ${state.cache.rubrics.map(x => `<option value="${x.id}" ${x.id === r.rubric_id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>
-      <span class="mut">Crea o edita rúbricas en la sección “Rúbricas” del menú.</span></div>`;
+      <select id="reprubric" style="width:auto" title="Rúbrica de reporte que interpreta el total">
+        <option value="">Escala predeterminada</option>${rubrics.map(r => `<option value="${r.id}" ${r.id === rubricId ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select></div>
+    <p class="mut">Se genera solo: de cada estudiante se suman <b>todos sus exámenes, sus entrevistas y su coevaluación</b>. La rúbrica de reporte (elegida arriba) dice qué nivel le corresponde. Puedes ajustar la nota a mano y descargar el informe en PDF.</p>
+    <div class="stats"><div class="stat"><b>${students.length}</b><span>Estudiantes</span></div>
+      <div class="stat"><b>${students.filter(s => s.coeval).length}</b><span>Con coevaluación</span></div>
+      <div class="stat"><b>${students.filter(s => s.override).length}</b><span>Notas ajustadas</span></div>
+      <div class="stat"><b>${avg === null ? '—' : avg + ' %'}</b><span>Promedio general</span></div></div>
+    <input id="repq" placeholder="Buscar por nombre o correo…" autocomplete="off" style="margin-bottom:.8rem">
+    <div class="card tablewrap">${students.length ? `<table><thead><tr><th>Estudiante</th><th>Exámenes</th><th>Entrevistas</th><th>Coeval.</th><th>Total</th><th>%</th><th>Nivel</th><th></th></tr></thead>
+      <tbody id="reprows">${students.map(rowHTML).join('')}</tbody></table>`
+      : '<div class="empty"><div class="ic">📭</div>Aún no hay estudiantes que hayan presentado un examen.</div>'}</div>`;
   },
-  repview: ({ report: r, entries }) => {
-    const pct = e => Math.round(e.score / r.max_score * 100);
-    const avg = entries.length ? entries.reduce((s, e) => s + +e.score, 0) / entries.length : null;
-    const missing = r.courses.filter(c => !entries.some(e => norm(e.course) === norm(c)));
-    const lv = avg === null ? null : repLevel(r, avg);
+
+  repstudent: () => {
+    const s = student(state.rs), m = summarize(s, levels()), ex = s.exams, iv = s.interviews, cv = s.coeval;
+    const sub = list => { const a = Math.round(list.reduce((x, e) => x + e.score, 0) * 100) / 100, b = Math.round(list.reduce((x, e) => x + e.max, 0) * 100) / 100; return `<tr class="subtot"><td colspan="3"><b>Subtotal</b></td><td><b>${a} / ${b}</b></td><td>${pctTxt(a, b)}</td></tr>`; };
     return `
-    <div class="row" style="margin-bottom:1rem"><h2 class="grow" style="margin:0">${esc(r.title)}</h2>
-      <button class="ghost" data-act="reports">← Reportes</button>
-      <button class="sec" data-act="copyreplink" data-code="${esc(r.code)}">🔗 Copiar enlace</button>
-      <button data-act="reppdf" data-id="${r.id}" ${entries.length ? '' : 'disabled'}>⬇ Descargar PDF</button></div>
-    <div class="card"><div class="tags" style="margin:0">
-      <span class="tag">👤 ${esc(r.student_name)}</span>${r.grade_level ? `<span class="tag">${esc(r.grade_level)}</span>` : ''}${r.period ? `<span class="tag">${esc(r.period)}</span>` : ''}
-      <span class="tag">Nota máxima ${esc(r.max_score)}</span><span class="tag">Código <span class="code">${esc(r.code)}</span></span></div></div>
-    <div class="stats"><div class="stat"><b>${entries.length}${r.courses.length ? ' / ' + r.courses.length : ''}</b><span>Cursos registrados</span></div>
-      <div class="stat"><b>${avg === null ? '—' : Math.round(avg * 100) / 100}</b><span>Promedio (de ${esc(r.max_score)})</span></div>
-      <div class="stat"><b>${lv ? esc(lv.name) : '—'}</b><span>${r.levels ? 'Nivel del promedio' : 'Sin rúbrica'}</span></div></div>
-    ${missing.length ? `<div class="card"><b>Pendientes (${missing.length}):</b> <span class="mut">${missing.map(esc).join(' · ')}</span></div>` : ''}
-    <div class="card tablewrap">${entries.length ? `<table><thead><tr><th>Curso</th><th>Docente</th><th>Nota</th>${r.levels ? '<th>Nivel</th>' : ''}<th>Comentario</th><th>Fecha</th><th></th></tr></thead><tbody>
-    ${entries.map(e => `<tr><td><b>${esc(e.course)}</b></td><td>${esc(e.teacher_name)}</td>
-      <td><b>${esc(e.score)}</b>/${esc(r.max_score)} <span class="mut">(${pct(e)} %)</span></td>
-      ${r.levels ? (l => `<td><span class="tag ${esc(l.cls)}">${esc(l.name)}</span></td>`)(repLevel(r, e.score)) : ''}
-      <td style="white-space:pre-wrap;min-width:220px">${e.comment ? esc(e.comment) : '<span class="mut">—</span>'}</td>
-      <td>${fdate(e.updated_at)}</td>
-      <td><button class="sm danger" data-act="delentry" data-id="${e.id}" data-rid="${r.id}">✕</button></td></tr>`).join('')}
-    </tbody></table>` : '<div class="empty"><div class="ic">📭</div>Aún ningún docente ha registrado su nota. Comparte el enlace.</div>'}</div>`;
-  },
-  repform: () => {
-    const f = state.rf, i = f.info;
-    const mine = !!f.token;
-    return `
-    <div class="card center" style="max-width:560px"><img class="logo-sm" src="logo.webp" alt="Calvary Christian School">
-      <h2>${esc(i.title)}</h2>
-      <div class="tags"><span class="tag">👤 ${esc(i.student_name)}</span>${i.grade_level ? `<span class="tag">${esc(i.grade_level)}</span>` : ''}${i.period ? `<span class="tag">${esc(i.period)}</span>` : ''}</div>
-      <label>Tu nombre</label><input data-rf="teacher" value="${esc(f.teacher)}" autocomplete="name">
-      <label>Curso que impartes</label>
-      ${i.courses.length ? `<select data-rf="course"><option value="">Selecciona…</option>
-        ${i.courses.map(c => `<option value="${esc(c)}" ${norm(c) === norm(f.course) ? 'selected' : ''}>${esc(c)}${i.filled.some(x => norm(x) === norm(c)) ? ' (ya registrado)' : ''}</option>`).join('')}</select>`
-      : `<input data-rf="course" value="${esc(f.course)}" placeholder="Ej. Matemática">`}
-      ${mine ? '<p class="mut">Ya registraste este curso: puedes corregir tu nota o comentario.</p>' : ''}
-      <label>Nota de la unidad (0 a ${esc(i.max_score)})</label>
-      <input data-rf="score" type="number" min="0" max="${esc(i.max_score)}" step="any" inputmode="decimal" value="${esc(f.score)}">
-      <label>Comentario sobre el estudiante</label>
-      <textarea data-rf="comment" maxlength="2000" placeholder="Desempeño, actitud, áreas a reforzar…">${esc(f.comment)}</textarea>
-      <div class="row" style="margin-top:1.1rem"><button class="lg grow" data-act="repsend">${mine ? 'Guardar cambios' : 'Enviar'}</button></div></div>`;
-  },
-  repdone: ({ course }) => `
-    <div class="card center" style="text-align:center;max-width:520px"><img class="logo-sm" src="logo.webp" alt="Calvary Christian School">
-      <h2>¡Gracias!</h2><p>Tu nota y comentario de <b>${esc(course)}</b> quedaron registrados.</p>
-      <button class="sec" data-act="repagain">Corregir mi registro</button></div>`
+    <div class="row" style="margin-bottom:1rem"><button class="ghost" data-act="repback">← Reportes</button><span class="grow"></span>
+      <button class="sec" data-act="repadjust" data-key="${esc(s.key)}">✎ Ajustar nota</button>
+      <button data-act="reppdf" data-key="${esc(s.key)}" ${m.empty ? 'disabled' : ''}>⬇ Descargar PDF</button></div>
+    <div class="paper">
+      <div class="paper-head"><img src="logo-white.webp" alt="Calvary Christian School"><div><b>Calvary Christian School</b><span>Informe integral del estudiante</span></div></div>
+      <div class="paper-body">
+        <div class="paper-student"><small>ESTUDIANTE</small><h2>${esc(s.name)}</h2>${s.email ? `<span class="mut">${esc(s.email)}</span>` : ''}</div>
+        <div class="sumbox">
+          <div><small>TOTAL ACUMULADO</small><div class="sumbig">${m.empty ? '—' : `${m.total} <span>/ ${m.max}</span>`}</div>${m.empty ? '' : `<span class="mut">${m.pct} %</span>`}</div>
+          <div class="sumlvl">${m.level ? `<small>NIVEL${rubricName() ? ' · ' + esc(rubricName()) : ''}</small><div>${lvTag(m.level)}</div>` : ''}</div>
+          ${m.level && m.level.text ? `<p class="lvltext sumtext">${esc(m.level.text)}</p>` : ''}
+          ${m.adjusted ? `<p class="mut sumtext">✎ Nota ajustada manualmente (suma automática: ${m.auto}).${s.override.reason ? ' Motivo: ' + esc(s.override.reason) : ''}
+            <button class="sm ghost" data-act="repclear" data-key="${esc(s.key)}">Quitar ajuste</button></p>` : ''}
+        </div>
+
+        <h3 class="sec-title">Exámenes</h3>
+        ${ex.length ? `<div class="tablewrap"><table class="rep"><thead><tr><th>Examen</th><th>Fecha</th><th></th><th>Nota</th><th>%</th></tr></thead><tbody>
+          ${ex.map(e => `<tr><td><b>${esc(e.title)}</b>${e.edited ? ' <span class="tag warn">nota editada</span>' : ''}</td><td>${fmtD(e.date)}</td><td></td><td>${e.score} / ${e.max}</td><td>${pctTxt(e.score, e.max)}</td></tr>`).join('')}${sub(ex)}</tbody></table></div>` : '<p class="mut">Sin exámenes registrados.</p>'}
+
+        <h3 class="sec-title">Entrevistas</h3>
+        ${iv.length ? `<div class="tablewrap"><table class="rep"><thead><tr><th>Rúbrica</th><th>Entrevistado / Entrevistador</th><th>Fecha</th><th>Puntos</th><th>%</th></tr></thead><tbody>
+          ${iv.map(i => `<tr><td><b>${esc(i.rubric)}</b></td><td>${esc(i.who)}${i.interviewer ? ` <span class="mut">· ${esc(i.interviewer)}</span>` : ''}</td><td>${fmtD(i.date)}</td><td>${i.score} / ${i.max}</td><td>${pctTxt(i.score, i.max)}</td></tr>`).join('')}${sub(iv)}</tbody></table></div>` : '<p class="mut">Sin entrevistas registradas.</p>'}
+
+        <h3 class="sec-title">Coevaluación docente</h3>
+        ${cv ? `<div class="tablewrap"><table class="rep"><thead><tr><th>Área</th><th></th><th>Suma de niveles</th><th>Puntos</th><th>%</th></tr></thead><tbody>
+          ${cv.parts.map(p => `<tr><td><b>${esc(p.name)}</b></td><td></td><td>${p.raw} / ${p.max}</td><td>${p.points} / ${p.outOf}</td><td>${pctTxt(p.points, p.outOf)}</td></tr>`).join('')}
+          <tr class="subtot"><td colspan="3"><b>Total coevaluación</b></td><td><b>${cv.score} / ${cv.max}</b></td><td>${pctTxt(cv.score, cv.max)}</td></tr></tbody></table></div>
+          ${cv.comment ? `<p style="white-space:pre-wrap"><b>Comentario:</b> ${esc(cv.comment)}</p>` : ''}` : '<p class="mut">Sin coevaluación registrada.</p>'}
+      </div>
+      <div class="paper-foot">Calvary Christian School · Documento confidencial</div>
+    </div>`;
+  }
 };
+
+/* Búsqueda de la lista: solo muestra u oculta filas (lo llama events.js) */
+export function onRepFilter() {
+  const text = norm($('#repq').value);
+  document.querySelectorAll('#reprows tr').forEach(r => { r.hidden = !r.dataset.find.includes(text); });
+}
+/* Cambia la rúbrica de reporte con la que se interpretan los totales (se recuerda en este navegador) */
+export function onRepRubric(t) {
+  state.rep.rubricId = t.value;
+  try { localStorage.setItem('rep:rubric', t.value); } catch { }
+  const y = scrollY; render('reports'); scrollTo(0, y);
+}
 
 export const acts = {
   reports: () => go('reports'),
-  newreport: () => {
-    state.rp = { _new: true, title: '', student_name: '', grade_level: '', period: '', code: Math.random().toString(36).slice(2, 8).toUpperCase(), max_score: 100, coursesTxt: '', rubric_id: '' };
-    go('repedit');
+  repback: () => { render('reports'); window.scrollTo(0, 0); },
+  repstudent: el => { state.rs = el.dataset.key; render('repstudent'); window.scrollTo(0, 0); },
+  reppdf: async el => { const s = student(el.dataset.key); await reportPDF(s, summarize(s, levels()), rubricName()); },
+  repadjust: el => {
+    const s = student(el.dataset.key), m = summarize(s, levels());
+    if (m.empty) return toast('Este estudiante todavía no tiene notas.', 'err');
+    const d = document.createElement('div'); d.className = 'modal small';
+    d.innerHTML = `<div class="card"><h3>Ajustar la nota de ${esc(s.name)}</h3>
+      <p class="mut">La suma automática es <b>${m.auto} / ${m.max}</b>. La nota que escribas reemplaza a la suma en el informe.</p>
+      <label>Nota final (0 a ${m.max})</label><input id="adjval" type="number" min="0" max="${m.max}" step="any" inputmode="decimal" value="${m.total}">
+      <label>Motivo (opcional)</label><textarea id="adjwhy" maxlength="500">${esc(s.override?.reason || '')}</textarea>
+      <div class="row" style="justify-content:flex-end;margin-top:1rem"><button class="ghost" data-act="closemodal">Cancelar</button>
+      <button data-act="dorepadjust" data-key="${esc(s.key)}" data-max="${m.max}">Guardar</button></div></div>`;
+    document.body.appendChild(d); $('#adjval').select();
   },
-  editreport: el => {
-    const r = JSON.parse(JSON.stringify(state.cache.reports.find(x => x.id === el.dataset.id)));
-    state.rp = { ...r, coursesTxt: r.courses.join('\n'), rubric_id: r.rubric_id || '' };
-    go('repedit');
+  dorepadjust: async el => {
+    const s = student(el.dataset.key), v = $('#adjval').value.trim(), n = +v, max = +el.dataset.max;
+    if (v === '' || !(n >= 0 && n <= max)) return toast(`La nota debe estar entre 0 y ${max}.`, 'err');
+    const row = await q(sb.from('report_overrides').upsert({ student_key: s.key, student_name: s.name, manual_total: n, reason: $('#adjwhy').value.trim().slice(0, 500), updated_at: new Date().toISOString() }, { onConflict: 'student_key' }).select().single());
+    s.override = row; $('.modal')?.remove(); toast('Nota ajustada', 'ok'); render('repstudent');
   },
-  savereport: async () => {
-    const title = state.rp.title.trim(), student = state.rp.student_name.trim(), code = state.rp.code.trim().toUpperCase();
-    if (!title) return toast('Pon un título al reporte.', 'err');
-    if (!student) return toast('Escribe el nombre del estudiante.', 'err');
-    if (!/^[A-Z0-9_-]+$/.test(code)) return toast('El código solo puede llevar letras, números, - y _.', 'err');
-    const max = +state.rp.max_score;
-    if (!(max > 0)) return toast('La nota máxima debe ser mayor que 0.', 'err');
-    const courses = [...new Map(state.rp.coursesTxt.split(/\r?\n/).map(s => s.trim()).filter(Boolean).map(s => [norm(s), s])).values()];
-    const row = { title, student_name: student, grade_level: state.rp.grade_level.trim(), period: state.rp.period.trim(), code, courses,
-      rubric_id: state.rp.rubric_id || null, levels: state.cache.rubrics.find(x => x.id === state.rp.rubric_id)?.levels || null };
-    try {
-      await q(state.rp._new ? sb.from('reports').insert({ ...row, max_score: max }) : sb.from('reports').update(row).eq('id', state.rp.id));
-    } catch (e) { throw new Error(e.code === '23505' ? 'Ya existe otro reporte con ese código.' : e.message); }
-    toast('Reporte guardado', 'ok'); go('reports');
-  },
-  delreport: async el => {
-    if (!await ask('¿Borrar el reporte y todas las notas registradas?', 'Borrar')) return;
-    await q(sb.from('reports').delete().eq('id', el.dataset.id)); go('reports');
-  },
-  copyreplink: async el => {
-    const url = location.origin + location.pathname + '#/reporte/' + el.dataset.code;
-    try { await navigator.clipboard.writeText(url); toast('Enlace copiado', 'ok'); } catch { prompt('Copia el enlace:', url); }
-  },
-  repview: el => go('repview', el.dataset.id),
-  delentry: async el => {
-    if (!await ask('¿Borrar este registro?', 'Borrar')) return;
-    await q(sb.from('report_entries').delete().eq('id', el.dataset.id)); go('repview', el.dataset.rid);
-  },
-  reppdf: async el => reportPDF(await loaders.repview(el.dataset.id)),
-  repsend: async () => {
-    const f = state.rf, i = f.info, score = f.score === '' ? NaN : +f.score;
-    if (!f.teacher.trim()) return toast('Escribe tu nombre.', 'err');
-    if (!f.course.trim()) return toast('Indica el curso.', 'err');
-    if (!(score >= 0 && score <= i.max_score)) return toast(`La nota debe estar entre 0 y ${i.max_score}.`, 'err');
-    const r = await rpc('report_submit', { p_code: f.code, p_course: f.course, p_teacher: f.teacher, p_score: score, p_comment: f.comment, p_token: f.token });
-    try { localStorage.setItem(repKey(f.code, r.course), r.token); localStorage.setItem('rep:teacher', f.teacher.trim()); } catch { }
-    f.token = r.token; f.course = r.course;
-    if (!i.filled.some(x => norm(x) === norm(r.course))) i.filled.push(r.course);
-    render('repdone', { course: r.course });
-  },
-  repagain: () => render('repform')
+  repclear: async el => {
+    const s = student(el.dataset.key);
+    if (!await ask('¿Quitar el ajuste y volver a la suma automática?', 'Quitar')) return;
+    await q(sb.from('report_overrides').delete().eq('student_key', s.key)); s.override = null; render('repstudent');
+  }
 };
-
-export const repLevel = (r, score) => r.levels ? levelFor(Math.round(score / r.max_score * 100), r.levels) : null;
-export const repKey = (code, course) => `rep:${code}:${norm(course)}`;
-/* Si este navegador ya registró el curso elegido, recupera ese registro para poder corregirlo */
-export async function loadMine() {
-  const course = state.rf.course; state.rf.token = null;
-  let tk = null; try { tk = course && localStorage.getItem(repKey(state.rf.code, course)); } catch { }
-  if (tk) {
-    try {
-      const m = await rpc('report_my_entry', { p_code: state.rf.code, p_course: course, p_token: tk });
-      if (m && state.rf.course === course) { state.rf.token = tk; state.rf.teacher = m.teacher; state.rf.score = String(m.score); state.rf.comment = m.comment; }
-    } catch { }
-  }
-  redraw('repform');
-}
-
-export const JSPDF = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-export const loadScript = src => new Promise((res, rej) => {
-  if (loadScript[src]) return res();
-  const s = document.createElement('script'); s.src = src;
-  s.onload = () => { loadScript[src] = true; res(); };
-  s.onerror = () => rej(new Error('No se pudo cargar el generador de PDF. Revisa tu conexión.'));
-  document.head.appendChild(s);
-});
-export const logoPng = () => new Promise(res => {
-  const im = new Image();
-  im.onload = () => { // se reduce: en el PDF ocupa ~54 pt
-    const k = Math.min(1, 220 / Math.max(im.naturalWidth, im.naturalHeight)), c = document.createElement('canvas');
-    c.width = Math.round(im.naturalWidth * k); c.height = Math.round(im.naturalHeight * k);
-    c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); res(c.toDataURL('image/png'));
-  };
-  im.onerror = () => res(null);
-  im.src = 'logo.webp';
-});
-
-export async function reportPDF({ report: r, entries }) {
-  await loadScript(JSPDF);
-  const doc = new window.jspdf.jsPDF({ unit: 'pt', format: 'letter' });
-  const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 48, CW = W - 2 * M;
-  const NAVY = [27, 42, 78], GOLD = [201, 169, 107], GRAY = [102, 112, 137], INK = [22, 33, 63];
-  let y = M;
-  const need = h => { if (y + h > H - M) { doc.addPage(); y = M; } };
-  const txt = (s, x, size, style, color, opt) => { doc.setFont('helvetica', style); doc.setFontSize(size); doc.setTextColor(...color); doc.text(String(s), x, y, opt); };
-
-  const wrap = (s, w) => { doc.setFont('helvetica', 'normal'); doc.setFontSize(10); return doc.splitTextToSize(s, w); };
-  const logo = await logoPng();
-  if (logo) doc.addImage(logo, 'PNG', M, y - 6, 54, 54);
-  txt('Calvary Christian School', M + 66, 18, 'bold', NAVY); y += 18;
-  txt('Reporte de seguimiento del estudiante', M + 66, 11, 'normal', GRAY); y += 36;
-  doc.setDrawColor(...GOLD); doc.setLineWidth(1.5); doc.line(M, y, W - M, y); y += 26;
-
-  txt(r.title, M, 15, 'bold', INK); y += 22;
-  const info = [['Estudiante', r.student_name], r.grade_level && ['Grado / sección', r.grade_level], r.period && ['Período', r.period], ['Fecha de emisión', new Date().toLocaleDateString('es')]].filter(Boolean);
-  for (const [k, v] of info) { txt(k + ':', M, 10.5, 'bold', GRAY); txt(v, M + 100, 10.5, 'normal', INK); y += 16; }
-  y += 8;
-
-  if (entries.length) {
-    const avg = entries.reduce((s, e) => s + +e.score, 0) / entries.length, lv = repLevel(r, avg);
-    const avgTxt = `${Math.round(avg * 100) / 100} / ${r.max_score}  (${Math.round(avg / r.max_score * 100)} %)`;
-    const lines = lv ? wrap(lv.text, CW - 24) : [];
-    const h = 46 + (lv ? 18 + lines.length * 13 : 0);
-    need(h);
-    doc.setFillColor(238, 241, 248); doc.roundedRect(M, y, CW, h, 6, 6, 'F');
-    y += 20; txt('Resumen', M + 12, 11, 'bold', NAVY);
-    txt(`Cursos registrados: ${entries.length}${r.courses.length ? ' de ' + r.courses.length : ''}`, W - M - 12, 10, 'normal', GRAY, { align: 'right' }); y += 18;
-    txt('Promedio: ' + avgTxt + (lv ? '   ·   Nivel: ' + lv.name : ''), M + 12, 11, 'bold', INK);
-    if (lv) { y += 18; doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(...INK); doc.text(lines, M + 12, y); y += (lines.length - 1) * 13; }
-    y += 30;
-  }
-
-  txt('Detalle por curso', M, 13, 'bold', NAVY); y += 10;
-  for (const e of entries) {
-    const lines = e.comment ? wrap(e.comment, CW) : [];
-    need(54 + Math.min(lines.length, 6) * 13);
-    y += 14; doc.setDrawColor(232, 229, 220); doc.setLineWidth(.7); doc.line(M, y - 6, W - M, y - 6); y += 8;
-    const lv = repLevel(r, e.score);
-    txt(e.course, M, 12, 'bold', INK);
-    txt(`${e.score} / ${r.max_score}  (${Math.round(e.score / r.max_score * 100)} %)${lv ? '  ·  ' + lv.name : ''}`, W - M, 11, 'bold', NAVY, { align: 'right' }); y += 15;
-    txt(`Docente: ${e.teacher_name}`, M, 9.5, 'normal', GRAY); y += 15;
-    if (lines.length) {
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(...INK);
-      for (const ln of lines) { need(14); doc.text(ln, M, y); y += 13; }
-    } else { txt('Sin comentario.', M, 10, 'italic', GRAY); y += 13; }
-  }
-
-  const n = doc.getNumberOfPages();
-  for (let p = 1; p <= n; p++) {
-    doc.setPage(p); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(...GRAY);
-    doc.text('Calvary Christian School · Documento confidencial', M, H - 24);
-    doc.text(`Página ${p} de ${n}`, W - M, H - 24, { align: 'right' });
-  }
-  const slug = r.student_name.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase();
-  doc.save(`reporte-${slug || 'estudiante'}.pdf`);
-}

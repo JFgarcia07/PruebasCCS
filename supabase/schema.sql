@@ -612,3 +612,24 @@ alter table public.coevaluations enable row level security;
 drop policy if exists coevaluations_admin on public.coevaluations;
 create policy coevaluations_admin on public.coevaluations for all to authenticated
   using (public.is_admin()) with check (public.is_admin());
+
+
+-- =====================================================================
+-- REPORTES AUTOMÁTICOS (solo administración)
+-- El reporte de cada estudiante se calcula en la app sumando sus exámenes, entrevistas y coevaluación.
+-- Aquí solo se guarda el ajuste manual de la nota (si la administración la cambia a mano).
+-- Las tablas antiguas de reportes (reports, report_entries) se conservan sin usar, por si necesitas esos datos.
+-- Ejecutar esta sección es seguro aunque ya hayas corrido lo anterior.
+-- =====================================================================
+create table if not exists public.report_overrides (
+  student_key  text primary key,                      -- igual que en coevaluaciones: correo, o 'n:' + nombre normalizado
+  student_name text not null default '',
+  manual_total numeric not null check (manual_total >= 0),
+  reason       text not null default '',
+  updated_by   uuid default auth.uid() references auth.users(id) on delete set null,
+  updated_at   timestamptz not null default now()
+);
+alter table public.report_overrides enable row level security;
+drop policy if exists report_overrides_admin on public.report_overrides;
+create policy report_overrides_admin on public.report_overrides for all to authenticated
+  using (public.is_admin()) with check (public.is_admin());

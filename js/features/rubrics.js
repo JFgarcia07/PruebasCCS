@@ -11,7 +11,7 @@ import { isAdmin } from '../core/state.js';
 const KINDS = [['exam', 'Examen'], ['report', 'Reporte'], ['interview', 'Entrevista']];
 const HELP = {
   exam: 'Define el nombre y el mensaje que ve el estudiante según su porcentaje. Se asigna a cada examen al editarlo.',
-  report: 'Define el nivel y el mensaje que se aplica al porcentaje de la nota de un reporte de estudiante. Se asigna al crear o editar el reporte.',
+  report: 'Interpreta el total de cada estudiante en Reportes (suma de exámenes, entrevistas y coevaluación): según su porcentaje le asigna un nivel y un mensaje. Eliges cuál usar en la pantalla de Reportes.',
   interview: 'Lista de criterios con su valor máximo. Se usa en Entrevistas (con alumnos o padres de familia): llenas una tabla con la nota de cada criterio.'
 };
 const kindOf = r => r.kind || 'exam';
@@ -127,7 +127,6 @@ export const acts = {
       await q(sb.from('rubrics').update(row).eq('id', rb.id));
       // lo que ya usa la rúbrica se actualiza con sus niveles nuevos
       if (kind === 'exam') await q(sb.from('exams').update({ levels }).eq('rubric_id', rb.id));
-      if (kind === 'report') await q(sb.from('reports').update({ levels }).eq('rubric_id', rb.id));
     }
     state.rubTab = kind;
     toast('Rúbrica guardada', 'ok'); go('rubrics');

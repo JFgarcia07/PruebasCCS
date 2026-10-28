@@ -125,3 +125,24 @@ table.rub tbody tr:hover{background:inherit}
 .lv{display:inline-grid;place-items:center;min-width:1.9rem;height:1.9rem;border-radius:8px;font-weight:700;background:var(--bg);color:var(--mut)}
 .lv4{background:var(--ok-soft);color:var(--ok)}.lv3{background:#ecfccb;color:#4d7c0f}.lv2{background:var(--warn-soft);color:var(--warn)}.lv1{background:var(--bad-soft);color:var(--bad)}
 table.matrix tbody tr:hover{background:inherit}
+
+/* Informe del estudiante (reporte automático) */
+.paper{background:#fff;border:1px solid var(--line);border-radius:6px;box-shadow:var(--shadow);overflow:hidden;max-width:880px;margin:0 auto 1.5rem}
+.paper-head{display:flex;align-items:center;gap:1.1rem;padding:1.1rem 1.8rem;background:var(--pri);color:#fff;border-bottom:5px solid var(--acc)}
+.paper-head img{width:74px;height:74px;object-fit:contain}
+.paper-head b{display:block;font-size:1.4rem;font-family:Georgia,"Times New Roman",serif;letter-spacing:.01em}
+.paper-head span{color:var(--acc);font-size:.92rem}
+.paper-body{padding:1.6rem 1.8rem}
+.paper-student small,.sumbox small{color:var(--mut);font-weight:700;letter-spacing:.1em;font-size:.7rem}
+.paper-student h2{margin:.1rem 0;font-size:1.75rem;color:var(--pri);font-family:Georgia,"Times New Roman",serif}
+.sumbox{display:grid;grid-template-columns:1fr auto;gap:.4rem 1.5rem;align-items:center;background:var(--pri-soft);border-left:5px solid var(--acc);border-radius:6px;padding:1.1rem 1.3rem;margin:1.1rem 0 .6rem}
+.sumbig{font-size:2.5rem;font-weight:800;color:var(--pri);line-height:1.1}.sumbig span{font-size:1.2rem;color:var(--mut);font-weight:600}
+.sumlvl{text-align:right}.sumlvl .tag{font-size:1rem;padding:.3rem 1rem}
+.sumtext{grid-column:1/-1;margin:.3rem 0 0}
+.sec-title{font-family:Georgia,"Times New Roman",serif;color:var(--pri);font-size:1.15rem;margin:1.7rem 0 .6rem;padding-bottom:.35rem;border-bottom:2px solid var(--acc)}
+table.rep th{background:var(--pri);color:#fff;font-size:.74rem}
+table.rep td{padding:.55rem .6rem}
+table.rep tr.subtot td{background:var(--pri-soft)}
+table.rep tbody tr:hover{background:inherit}
+.paper-foot{padding:.8rem 1.8rem;border-top:1px solid var(--line);color:var(--mut);font-size:.8rem;text-align:center}
+@media (max-width:600px){.sumbox{grid-template-columns:1fr}.sumlvl{text-align:left}.paper-head{padding:1rem}.paper-body{padding:1.2rem 1rem}}

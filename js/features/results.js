@@ -27,7 +27,7 @@ export const views = {
     const alerts = attempts.reduce((s, a) => s + a.flags.length, 0);
     return `
     <div class="row" style="margin-bottom:1rem"><h2 class="grow" style="margin:0">Resultados</h2>
-      <button class="sec" data-act="reports">📝 Ver reportes de estudiantes</button>
+      ${admin ? '<button class="sec" data-act="reports">📝 Ver reportes de estudiantes</button>' : ''}
       <select id="resfilter" style="width:auto"><option value="">Todos los exámenes</option>
       ${exams.map(e => `<option value="${e.id}" ${e.id === examId ? 'selected' : ''}>${esc(e.title)}</option>`).join('')}</select>
       <button class="sec" data-act="csv" data-id="${examId || ''}">⬇ CSV</button></div>

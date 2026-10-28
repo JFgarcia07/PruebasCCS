@@ -5,7 +5,7 @@ import { onAudioFile, onAudioUrl } from './features/audio.js';
 import { onImportFile } from './features/exams.js';
 import { onCoevalInput, onCoevFilter } from './features/coeval.js';
 import { ivToggle, onInterviewChange } from './features/interviews.js';
-import { loadMine } from './features/reports.js';
+import { onRepFilter, onRepRubric } from './features/reports.js';
 import { critTotal, onRubricKind } from './features/rubrics.js';
 import { markNav, saveAnswers } from './features/student.js';
 
@@ -13,8 +13,7 @@ document.addEventListener('input', e => {
   const t = e.target;
   if (t.id === 'cvq' || t.id === 'cvfilter') onCoevFilter();
   else if (t.dataset.cvf || t.dataset.cvk) onCoevalInput(t);
-  else if (t.dataset.rp) state.rp[t.dataset.rp] = t.value;
-  else if (t.dataset.rf) state.rf[t.dataset.rf] = t.value;
+  else if (t.id === 'repq') onRepFilter();
   else if (t.dataset.cf) {
     state.rb.criteria[+t.dataset.c][t.dataset.cf] = t.value;
     if (t.dataset.cf === 'max') { const tt = document.getElementById('crittotal'); if (tt) tt.textContent = critTotal(state.rb.criteria); }
@@ -44,7 +43,7 @@ document.addEventListener('change', async e => {
   if (t.id === 'ivfilter') return go('interviews', t.value);
   if (t.dataset.rb === 'kind') return onRubricKind();
   if (t.id === 'resfilter') go('results', t.value);
-  if (t.dataset.rf === 'course') loadMine();
+  if (t.id === 'reprubric') return onRepRubric(t);
   if (t.dataset.afile !== undefined && t.files[0]) return onAudioFile(t);
   if (t.dataset.aurl !== undefined) return onAudioUrl(t);
   if (t.id === 'impfile' && t.files[0]) return onImportFile(t);

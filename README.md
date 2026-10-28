@@ -19,11 +19,10 @@ Frontend estático (HTML/CSS/JS) + Supabase (Auth, Postgres con RLS, funciones R
   Es disuasorio, no infalible.
 # PruebasCCS
 
-## Reportes de estudiante
-- Menú **Reportes** (profesor): crea el reporte de *un* estudiante (título, grado, período, nota máxima, lista opcional de cursos y rúbrica opcional) y copia el enlace `#/reporte/CÓDIGO`.
-- Los demás docentes abren el enlace sin cuenta, eligen su curso y dejan la nota de la unidad y un comentario (RPC `report_*`). Un curso solo lo puede corregir el navegador que lo registró (token secreto).
-- **Resultados** (botón en esa pantalla o en el reporte): tabla con todo lo registrado, promedio, cursos pendientes y **descarga en PDF** (jsPDF desde cdnjs).
-- Si cambias de proyecto Supabase, vuelve a ejecutar `supabase/schema.sql` (la sección de reportes es idempotente).
+## Reportes de estudiante (automáticos, solo administración)
+- Menú **Reportes**: de cada estudiante se suman **todos sus exámenes, sus entrevistas y su coevaluación**. El total (puntos y %) se interpreta con la **rúbrica de tipo reporte** que elijas arriba (o la escala predeterminada).
+- Las entrevistas se asignan al estudiante por su nombre (alumno entrevistado, o hijo/a de un padre entrevistado). Los exámenes y la coevaluación, por su correo.
+- La administración puede **ajustar la nota a mano** (queda marcada como ajustada, con motivo) y **descargar el informe en PDF**.
 
 ## Enviar exámenes a otro profesor
 - En **Mis exámenes** → **📤 Enviar exámenes**: elige los exámenes y escribe el correo de otro profesor (debe tener cuenta). Pasan a su cuenta con todos sus intentos y desaparecen de la tuya (RPC `transfer_exams`). La rúbrica vinculada se desvincula, pero el examen conserva sus niveles.
