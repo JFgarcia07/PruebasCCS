@@ -14,6 +14,8 @@ const levels = () => state.rep.rubrics.find(r => r.id === state.rep.rubricId)?.l
 const rubricName = () => state.rep.rubrics.find(r => r.id === state.rep.rubricId)?.name || '';
 const student = key => state.rep.students.find(s => s.key === key);
 const lvTag = l => l ? `<span class="tag ${esc(l.cls)}">${esc(l.name)}</span>` : '<span class="mut">—</span>';
+/* Puntos de una parte: «23 / 50» y, entre paréntesis, cuántos exámenes o entrevistas son */
+const partTxt = (p, count = true) => p.n ? `${p.score} / ${p.max}${count && p.n > 1 ? ` <span class="mut">(${p.n})</span>` : ''}` : '<span class="mut">—</span>';
 const pctTxt = (a, b) => b ? Math.round(a / b * 100) + ' %' : '—';
 
 export const loaders = {
@@ -38,7 +40,7 @@ const rowHTML = s => {
   const m = summarize(s, levels());
   return `<tr data-find="${esc(norm(s.name + ' ' + s.email))}">
     <td><b>${esc(s.name)}</b>${s.email ? `<br><span class="mut">${esc(s.email)}</span>` : ''}</td>
-    <td>${s.exams.length}</td><td>${s.interviews.length}</td><td>${s.coeval ? '✔' : '<span class="mut">—</span>'}</td>
+    <td>${partTxt(m.parts.exams)}</td><td>${partTxt(m.parts.interviews)}</td><td>${partTxt(m.parts.coeval, false)}</td>
     <td style="white-space:nowrap">${m.empty ? '<span class="mut">—</span>' : `<b>${m.total}</b> / ${m.max}${m.adjusted ? ' <span class="tag warn" title="Nota ajustada a mano">ajustada</span>' : ''}`}</td>
     <td>${m.empty ? '' : m.pct + ' %'}</td><td>${m.empty ? '' : lvTag(m.level)}</td>
     <td class="row"><button class="sm" data-act="repstudent" data-key="${esc(s.key)}">Ver</button>
@@ -59,14 +61,14 @@ export const views = {
       <div class="stat"><b>${students.filter(s => s.override).length}</b><span>Notas ajustadas</span></div>
       <div class="stat"><b>${avg === null ? '—' : avg + ' %'}</b><span>Promedio general</span></div></div>
     <input id="repq" placeholder="Buscar por nombre o correo…" autocomplete="off" style="margin-bottom:.8rem">
-    <div class="card tablewrap">${students.length ? `<table><thead><tr><th>Estudiante</th><th>Exámenes</th><th>Entrevistas</th><th>Coeval.</th><th>Total</th><th>%</th><th>Nivel</th><th></th></tr></thead>
+    <div class="card tablewrap">${students.length ? `<table><thead><tr><th>Estudiante</th><th>Exámenes</th><th>Entrevistas</th><th>Coevaluación</th><th>Total</th><th>%</th><th>Nivel</th><th></th></tr></thead>
       <tbody id="reprows">${students.map(rowHTML).join('')}</tbody></table>`
       : '<div class="empty"><div class="ic">📭</div>Aún no hay estudiantes que hayan presentado un examen.</div>'}</div>`;
   },
 
   repstudent: () => {
     const s = student(state.rs), m = summarize(s, levels()), ex = s.exams, iv = s.interviews, cv = s.coeval;
-    const sub = list => { const a = Math.round(list.reduce((x, e) => x + e.score, 0) * 100) / 100, b = Math.round(list.reduce((x, e) => x + e.max, 0) * 100) / 100; return `<tr class="subtot"><td colspan="3"><b>Subtotal</b></td><td><b>${a} / ${b}</b></td><td>${pctTxt(a, b)}</td></tr>`; };
+    const sub = (list, span = 3, pct = 1) => { const a = Math.round(list.reduce((x, e) => x + e.score, 0) * 100) / 100, b = Math.round(list.reduce((x, e) => x + e.max, 0) * 100) / 100; return `<tr class="subtot"><td colspan="${span}"><b>Subtotal</b></td><td><b>${a} / ${b}</b></td>${pct ? `<td>${pctTxt(a, b)}</td>` : ''}</tr>`; };
     return `
     <div class="row" style="margin-bottom:1rem"><button class="ghost" data-act="repback">← Reportes</button><span class="grow"></span>
       <button class="sec" data-act="repadjust" data-key="${esc(s.key)}">✎ Ajustar nota</button>
@@ -78,6 +80,8 @@ export const views = {
         <div class="sumbox">
           <div><small>TOTAL ACUMULADO</small><div class="sumbig">${m.empty ? '—' : `${m.total} <span>/ ${m.max}</span>`}</div>${m.empty ? '' : `<span class="mut">${m.pct} %</span>`}</div>
           <div class="sumlvl">${m.level ? `<small>NIVEL${rubricName() ? ' · ' + esc(rubricName()) : ''}</small><div>${lvTag(m.level)}</div>` : ''}</div>
+          ${m.empty ? '' : `<p class="mut sumtext" style="margin:0">Exámenes <b>${m.parts.exams.score} / ${m.parts.exams.max}</b> · Entrevistas <b>${m.parts.interviews.score} / ${m.parts.interviews.max}</b> · Coevaluación <b>${m.parts.coeval.score} / ${m.parts.coeval.max}</b></p>`}
+          ${!m.empty && m.max !== 100 ? `<p class="sumtext" style="margin:0;color:var(--warn)">⚠ El máximo posible de este estudiante suma <b>${m.max}</b>, no 100: tiene ${m.parts.exams.n} ${m.parts.exams.n === 1 ? 'examen terminado' : 'exámenes terminados'} (${m.parts.exams.max} pts), ${m.parts.interviews.n} ${m.parts.interviews.n === 1 ? 'entrevista' : 'entrevistas'} (${m.parts.interviews.max} pts) y ${m.parts.coeval.n ? 'coevaluación (' + m.parts.coeval.max + ' pts)' : 'sin coevaluación'}. Revisa las tablas de abajo.</p>` : ''}
           ${m.level && m.level.text ? `<p class="lvltext sumtext">${esc(m.level.text)}</p>` : ''}
           ${m.adjusted ? `<p class="mut sumtext">✎ Nota ajustada manualmente (suma automática: ${m.auto}).${s.override.reason ? ' Motivo: ' + esc(s.override.reason) : ''}
             <button class="sm ghost" data-act="repclear" data-key="${esc(s.key)}">Quitar ajuste</button></p>` : ''}
@@ -88,8 +92,8 @@ export const views = {
           ${ex.map(e => `<tr><td><b>${esc(e.title)}</b>${e.edited ? ' <span class="tag warn">nota editada</span>' : ''}</td><td>${fmtD(e.date)}</td><td></td><td>${e.score} / ${e.max}</td><td>${pctTxt(e.score, e.max)}</td></tr>`).join('')}${sub(ex)}</tbody></table></div>` : '<p class="mut">Sin exámenes registrados.</p>'}
 
         <h3 class="sec-title">Entrevistas</h3>
-        ${iv.length ? `<div class="tablewrap"><table class="rep"><thead><tr><th>Rúbrica</th><th>Entrevistado / Entrevistador</th><th>Fecha</th><th>Puntos</th><th>%</th></tr></thead><tbody>
-          ${iv.map(i => `<tr><td><b>${esc(i.rubric)}</b></td><td>${esc(i.who)}${i.interviewer ? ` <span class="mut">· ${esc(i.interviewer)}</span>` : ''}</td><td>${fmtD(i.date)}</td><td>${i.score} / ${i.max}</td><td>${pctTxt(i.score, i.max)}</td></tr>`).join('')}${sub(iv)}</tbody></table></div>` : '<p class="mut">Sin entrevistas registradas.</p>'}
+        ${iv.length ? `<div class="tablewrap"><table class="rep"><thead><tr><th>Rúbrica</th><th>Entrevistado / Entrevistador</th><th>Fecha</th><th>Puntos</th></tr></thead><tbody>
+          ${iv.map(i => `<tr><td><b>${esc(i.rubric)}</b></td><td>${esc(i.who)}${i.interviewer ? ` <span class="mut">· ${esc(i.interviewer)}</span>` : ''}</td><td>${fmtD(i.date)}</td><td>${i.score} / ${i.max}</td></tr>`).join('')}${sub(iv, 3, 0)}</tbody></table></div>` : '<p class="mut">Sin entrevistas registradas.</p>'}
 
         <h3 class="sec-title">Coevaluación docente</h3>
         ${cv ? `<div class="tablewrap"><table class="rep"><thead><tr><th>Área</th><th></th><th>Suma de niveles</th><th>Puntos</th><th>%</th></tr></thead><tbody>

@@ -108,8 +108,8 @@ export async function reportPDF(s, sum, rubricName) {
 
   const iv = s.interviews;
   section('Entrevistas', iv.length ? iv.length + (iv.length === 1 ? ' entrevista' : ' entrevistas') : '', iv.length + 2);
-  table([{ t: 'RÚBRICA', w: 150 }, { t: 'ENTREVISTADO', w: 80 }, { t: 'ENTREVISTADOR', w: 110 }, { t: 'FECHA', w: 70 }, { t: 'PUNTOS', w: 60, r: 1 }, { t: '%', w: CW - 470, r: 1 }],
-    iv.map(i => [i.rubric, i.who, i.interviewer || '—', fdate(i.date).split(',')[0], `${i.score} / ${i.max}`, pc(i.score, i.max)]), 'Sin entrevistas registradas.');
+  table([{ t: 'RÚBRICA', w: 150 }, { t: 'ENTREVISTADO', w: 80 }, { t: 'ENTREVISTADOR', w: 110 }, { t: 'FECHA', w: 70 }, { t: 'PUNTOS', w: CW - 410, r: 1 }],
+    iv.map(i => [i.rubric, i.who, i.interviewer || '—', fdate(i.date).split(',')[0], `${i.score} / ${i.max}`]), 'Sin entrevistas registradas.');
   if (iv.length) { y -= 8; sumRow('Subtotal entrevistas', Math.round(iv.reduce((a, e) => a + e.score, 0) * 100) / 100, Math.round(iv.reduce((a, e) => a + e.max, 0) * 100) / 100); }
 
   const cv = s.coeval;

@@ -43,9 +43,11 @@ export function buildStudents(raw) {
 /* Total de un estudiante: suma de todo lo que tiene; la nota ajustada a mano reemplaza a la suma automática.
    `levels` = rangos de la rúbrica de reporte elegida (null = escala predeterminada). */
 export function summarize(s, levels) {
+  const part = list => ({ n: list.length, score: r2(list.reduce((a, x) => a + x.score, 0)), max: r2(list.reduce((a, x) => a + x.max, 0)) });
+  const parts = { exams: part(s.exams), interviews: part(s.interviews), coeval: part(s.coeval ? [s.coeval] : []) };
   const items = [...s.exams, ...s.interviews, ...(s.coeval ? [s.coeval] : [])];
   const auto = r2(items.reduce((a, x) => a + x.score, 0)), max = r2(items.reduce((a, x) => a + x.max, 0));
   const adjusted = !!s.override, total = adjusted ? +s.override.manual_total : auto;
   const pct = max ? Math.round(total / max * 100) : 0;
-  return { auto, max, total, pct, adjusted, level: max ? levelFor(pct, levels) : null, empty: !items.length };
+  return { parts, auto, max, total, pct, adjusted, level: max ? levelFor(pct, levels) : null, empty: !items.length };
 }

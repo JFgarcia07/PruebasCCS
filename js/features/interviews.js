@@ -10,7 +10,7 @@ const TYPES = { alumno: 'Alumno', padre: 'Padre / madre' };
 const scoreOf = (row, c) => Math.min(+c.max, Math.max(0, +row.scores[c.id] || 0));
 const totalOf = (row, cr) => Math.round(cr.reduce((s, c) => s + scoreOf(row, c), 0) * 100) / 100;
 const maxOf = cr => Math.round(cr.reduce((s, c) => s + +c.max, 0) * 100) / 100;
-const totalTxt = (row, cr) => { const t = totalOf(row, cr), m = maxOf(cr); return `<b>${t}</b> / ${m} <span class="mut">(${m ? Math.round(t / m * 100) : 0} %)</span>`; };
+const totalTxt = (row, cr) => `<b>${totalOf(row, cr)}</b> / ${maxOf(cr)}`;   // sobre el valor de la rúbrica, sin porcentaje
 /* Datos propios de cada tipo de entrevistado, en una línea */
 const details = r => (r.subject_type === 'padre'
   ? [r.child_name && 'Hijo/a: ' + r.child_name, r.age && r.age + ' años', r.email]
