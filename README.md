@@ -32,3 +32,12 @@ Frontend estático (HTML/CSS/JS) + Supabase (Auth, Postgres con RLS, funciones R
 - El listado de exámenes ya no descarga las preguntas (con audios pesan MB): usa `n_questions` y la RPC `my_exam_counts`; el examen completo se pide solo al editar, exportar o ver un intento.
 - El autoguardado, la verificación del código y el resto de las RPC de estudiante ya no leen el examen completo.
 - Se añadieron índices. **Vuelve a ejecutar `supabase/schema.sql` completo** en el SQL Editor para aplicar todo.
+
+## Estructura del código (`js/`)
+Módulos ES nativos: no hay paso de compilación; Live Server, Netlify o Cloudflare Pages lo sirven tal cual.
+- `main.js`: punto de entrada. Registra las vistas/acciones de cada módulo, conecta los clics y arranca.
+- `events.js`: eventos de formularios (`input` / `change`).
+- `core/`: `config.js` (cliente Supabase), `state.js` (estado compartido), `router.js` (navegación), `api.js` (consultas y RPC con reintentos), `ui.js` (avisos, confirmaciones), `levels.js`, `util.js`, `run.js` (cierre del examen en curso).
+- `features/`: un archivo por área; cada uno exporta sus `views`, `loaders` (datos que cargan) y `acts` (acciones de los botones `data-act`).
+  `auth` · `exams` · `rubrics` · `reports` · `results` · `student` · `audio`.
+- Para añadir una pantalla nueva: crea el archivo en `features/`, exporta `views` / `loaders` / `acts` y añádelo en la lista de `main.js`.
