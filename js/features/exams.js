@@ -10,7 +10,7 @@ import { audioEditHTML } from './audio.js';
 export const loaders = {
   async teacher() {
     const [exams, att] = await Promise.all([
-      q(sb.from('exams').select(EXAM_COLS).order('created_at', { ascending: false })),
+      q(sb.from('exams').select(EXAM_COLS).eq('owner', state.session.user.id).order('created_at', { ascending: false })),
       q(sb.rpc('my_exam_counts'))]);
     state.cache.exams = exams;
     rpc('purge_old_shots', { p_days: 60 }).catch(() => { }); // libera espacio: fotos de cámara de hace más de 60 días

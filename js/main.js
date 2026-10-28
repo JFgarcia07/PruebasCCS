@@ -2,6 +2,7 @@
 import { $ } from './core/util.js';
 import { sb } from './core/config.js';
 import { state } from './core/state.js';
+import { loadProfile } from './core/profile.js';
 import { toast, ask } from './core/ui.js';
 import { registry, go, nav, route } from './core/router.js';
 import * as auth from './features/auth.js';
@@ -38,7 +39,9 @@ $('#brand').addEventListener('click', async e => {
 (async function init() {
   if (sb) {
     state.session = (await sb.auth.getSession()).data.session;
-    sb.auth.onAuthStateChange((_e, s) => { state.session = s; nav(); });
+    await loadProfile();
+    // fuera del callback: supabase-js no admite llamadas a su API dentro de onAuthStateChange
+    sb.auth.onAuthStateChange((_e, s) => { state.session = s; setTimeout(() => loadProfile().then(nav), 0); });
   }
   route();
 })();

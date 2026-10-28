@@ -1,5 +1,6 @@
 /* Pantallas de inicio y acceso del profesor. */
 import { sb } from '../core/config.js';
+import { loadProfile } from '../core/profile.js';
 import { go } from '../core/router.js';
 import { state } from '../core/state.js';
 import { toast } from '../core/ui.js';
@@ -34,18 +35,19 @@ export const acts = {
   join: () => go('join'),
   tlogin: () => go(state.session ? 'teacher' : 'auth'),
   login: async () => {
-    const { error } = await sb.auth.signInWithPassword({ email: $('#email').value.trim(), password: $('#pass').value });
+    const { data, error } = await sb.auth.signInWithPassword({ email: $('#email').value.trim(), password: $('#pass').value });
     if (error) throw error;
+    state.session = data.session; await loadProfile(); // el menú depende del rol
     go('teacher');
   },
   signup: async () => {
     const { data, error } = await sb.auth.signUp({ email: $('#email').value.trim(), password: $('#pass').value });
     if (error) throw error;
-    if (data.session) go('teacher'); else toast('Cuenta creada. Revisa tu correo para confirmarla y luego entra.', 'ok');
+    if (data.session) { state.session = data.session; await loadProfile(); go('teacher'); } else toast('Cuenta creada. Revisa tu correo para confirmarla y luego entra.', 'ok');
   },
   logout: async () => {
     // 'local' borra la sesión de este navegador aunque no haya conexión con el servidor
     await sb.auth.signOut({ scope: 'local' }).catch(() => { });
-    state.session = null; state.ed = null; go('home');
+    state.session = null; state.profile = null; state.ed = null; go('home');
   }
 };

@@ -1,7 +1,6 @@
 /* Acceso a Supabase: consultas, RPC con reintentos y lectura del examen completo. */
 import { sb } from './config.js';
 import { wait } from './util.js';
-import { flag } from '../features/student.js';
 
 export async function q(p) { const { data, error } = await p; if (error) throw error; return data; }
 /* Las llamadas repetibles del estudiante (guardar, alertas, fotos) se reintentan ante cortes de red o
@@ -16,5 +15,5 @@ export async function rpc(fn, args, tries = /^student_(save|flag|shot)$/.test(fn
   }
 }
 
-export const EXAM_COLS = 'id,title,code,minutes,camera,shuffle,show_score,rubric_id,levels,created_at,n_questions'; // sin 'questions': con audios incrustados pesa MB
+export const EXAM_COLS = 'id,owner,title,code,minutes,camera,shuffle,show_score,rubric_id,levels,created_at,n_questions'; // sin 'questions': con audios incrustados pesa MB
 export const fullExam = id => q(sb.from('exams').select('*').eq('id', id).single());

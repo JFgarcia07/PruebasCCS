@@ -6,6 +6,7 @@ import { go, redraw } from '../core/router.js';
 import { state } from '../core/state.js';
 import { ask, toast } from '../core/ui.js';
 import { esc, uid } from '../core/util.js';
+import { isAdmin } from '../core/state.js';
 
 const KINDS = [['exam', 'Examen'], ['report', 'Reporte'], ['interview', 'Entrevista']];
 const HELP = {
@@ -14,6 +15,9 @@ const HELP = {
   interview: 'Lista de criterios con su valor máximo. Se usa en Entrevistas (con alumnos o padres de familia): llenas una tabla con la nota de cada criterio.'
 };
 const kindOf = r => r.kind || 'exam';
+/* Tipos que puede crear quien tiene la sesión: las de entrevista son solo de la administración */
+const tabKinds = () => isAdmin() ? KINDS : KINDS.filter(k => k[0] !== 'interview');
+const curTab = () => tabKinds().some(k => k[0] === state.rubTab) ? state.rubTab : 'exam';
 const newCrit = () => ({ id: uid(), name: '', description: '', max: 10 });
 const defaultLevels = () => LEVELS.map(({ min, name, cls, text }) => ({ min, name, cls, text }));
 export const critTotal = cr => Math.round(cr.reduce((s, c) => s + (+c.max || 0), 0) * 100) / 100;
@@ -27,12 +31,12 @@ export const loaders = {
 
 export const views = {
   rubrics: () => {
-    const tab = state.rubTab, all = state.cache.rubrics, list = all.filter(r => kindOf(r) === tab);
+    const tab = curTab(), all = state.cache.rubrics.filter(r => tabKinds().some(k => k[0] === kindOf(r))), list = all.filter(r => kindOf(r) === tab);
     const label = KINDS.find(k => k[0] === tab)[1].toLowerCase();
     return `
     <div class="row" style="margin-bottom:1rem"><h2 class="grow" style="margin:0">Rúbricas</h2>
       <button data-act="newrubric">＋ Nueva rúbrica de ${label}</button></div>
-    <div class="row" style="margin-bottom:.6rem">${KINDS.map(([k, n]) =>
+    <div class="row" style="margin-bottom:.6rem">${tabKinds().map(([k, n]) =>
       `<button class="sm ${k === tab ? '' : 'sec'}" data-act="rubtab" data-k="${k}">${n} (${all.filter(r => kindOf(r) === k).length})</button>`).join('')}</div>
     <p class="mut">${HELP[tab]}</p>
     ${list.length ? list.map(r => `<div class="card ex-card"><div class="grow"><h3 style="margin-bottom:.2rem">${esc(r.name)}</h3>
@@ -45,7 +49,7 @@ export const views = {
   },
   rubedit: () => {
     const rb = state.rb, kind = rb.kind || 'exam';
-    const kinds = rb._new ? KINDS : kind === 'interview' ? KINDS.filter(k => k[0] === 'interview') : KINDS.filter(k => k[0] !== 'interview');
+    const kinds = rb._new ? tabKinds() : kind === 'interview' ? KINDS.filter(k => k[0] === 'interview') : KINDS.filter(k => k[0] !== 'interview');
     return `
     <div class="row" style="margin-bottom:1rem"><h2 class="grow" style="margin:0">${rb._new ? 'Nueva rúbrica' : 'Editar rúbrica'}</h2>
       <button class="ghost" data-act="rubrics">Cancelar</button><button data-act="saverubric">Guardar rúbrica</button></div>
@@ -83,7 +87,7 @@ export const acts = {
   rubrics: () => go('rubrics'),
   rubtab: el => { state.rubTab = el.dataset.k; redraw('rubrics'); },
   newrubric: () => {
-    const kind = state.rubTab;
+    const kind = curTab();
     state.rb = { _new: true, kind, name: '', levels: kind === 'interview' ? [] : defaultLevels(), criteria: kind === 'interview' ? [newCrit()] : [] };
     go('rubedit');
   },

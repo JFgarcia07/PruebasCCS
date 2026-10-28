@@ -13,6 +13,7 @@ export const views = {
     <div class="card center"><h2>Presentar examen</h2>
       <label>Código del examen</label><input id="jcode" autocomplete="off" value="${esc(p?.code || '')}" style="text-transform:uppercase">
       <label>Tu nombre completo</label><input id="jname" autocomplete="name">
+      <label>Tu correo electrónico</label><input id="jemail" type="email" autocomplete="email" inputmode="email">
       <div id="camwrap" hidden><p class="mut camhint">📷 Este examen requiere cámara. Verifica que te veas bien.</p>
         <video id="cam" autoplay muted playsinline></video></div>
       <p id="jmsg" class="mut"></p>
@@ -53,14 +54,15 @@ export const acts = {
   finish: async () => { if (await ask('¿Enviar el examen? No podrás cambiar tus respuestas.', 'Enviar')) finishExam(false); }
 };
 
-export const tokKey = (code, name) => `att:${code}:${norm(name)}`;
+export const tokKey = (code, email) => `att:${code}:${norm(email)}`;
 
 export const setMsg = (t, bad) => { const m = $('#jmsg'); m.textContent = t; m.className = bad ? 'wrong' : 'mut'; };
 
 export async function startFlow() {
-  const code = $('#jcode').value.trim().toUpperCase(), name = $('#jname').value.trim();
+  const code = $('#jcode').value.trim().toUpperCase(), name = $('#jname').value.trim(), email = $('#jemail').value.trim();
   if (!code) return setMsg('Escribe el código del examen.', true);
   if (!name) return setMsg('Escribe tu nombre.', true);
+  if (!/^\S+@\S+\.\S+$/.test(email)) return setMsg('Escribe un correo electrónico válido.', true);
   setMsg('');
   let info;
   try { info = await rpc('student_exam_info', { p_code: code }); } catch (e) { return setMsg(e.message, true); }
@@ -75,14 +77,14 @@ export async function startFlow() {
       return setMsg('No se pudo acceder a la cámara (' + err.name + '). Este examen la exige: permite el acceso en el navegador y reintenta.', true);
     }
   }
-  let saved = {}; try { saved = JSON.parse(localStorage.getItem(tokKey(code, name)) || '{}'); } catch { }
+  let saved = {}; try { saved = JSON.parse(localStorage.getItem(tokKey(code, email)) || '{}'); } catch { }
   let r;
   setMsg('Entrando al examen…');
   await wait(Math.random() * 2500); // reparte la entrada cuando toda la clase pulsa a la vez
-  try { r = await rpc('student_start', { p_code: code, p_name: name, p_token: saved.token || null }); }
+  try { r = await rpc('student_start', { p_code: code, p_name: name, p_email: email, p_token: saved.token || null }); }
   catch (e) { return setMsg(e.message, true); }
   if (r.expired) { stopStream(); return setMsg('Tu tiempo para este examen ya terminó.', true); }
-  try { localStorage.setItem(tokKey(code, name), JSON.stringify({ token: r.token })); } catch { }
+  try { localStorage.setItem(tokKey(code, email), JSON.stringify({ token: r.token })); } catch { }
   runExam(r);
 }
 

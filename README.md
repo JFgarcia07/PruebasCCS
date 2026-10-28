@@ -46,3 +46,11 @@ Módulos ES nativos: no hay paso de compilación; Live Server, Netlify o Cloudfl
 - **Rúbricas** tiene tres pestañas: *Examen* y *Reporte* (niveles según el porcentaje; cada una se asigna en su editor) y *Entrevista* (criterios con valor máximo).
 - **Entrevistas** (menú): eliges una rúbrica de entrevista y llenas la tabla entrevistados × criterios (alumnos o padres de familia). El total se calcula solo y cada nota se guarda al salir de la casilla.
 - Requiere volver a ejecutar `supabase/schema.sql` (sección final: columnas `kind`/`criteria` y tabla `interviews`). Las rúbricas existentes quedan como *Examen*, salvo las que solo usan reportes, que pasan a *Reporte*.
+
+## Roles
+- **Maestro** (por defecto en toda cuenta nueva): crea sus exámenes y sus rúbricas de examen y reporte; ve solo los resultados de sus propios exámenes.
+- **Administración**: además ve todos los exámenes y resultados (con el profesor de cada uno), crea rúbricas y entrevistas de tipo entrevista y puede modificar notas a mano (se conserva la nota automática y queda marcada como *editada*).
+- Para nombrar a la administración, una sola vez en el SQL Editor de Supabase (nadie puede cambiar su rol desde la app):
+  `update public.profiles set role = 'admin' where email = 'correo@colegio.edu';`
+- **Estudiante**: para entrar al examen escribe código, nombre y correo. Hay un intento por correo y examen.
+- Entrevistas: siempre llevan entrevistado y entrevistador. Alumno: nombre, grado, edad y encargado. Padre/madre: nombre, hijo/a, edad y correo.

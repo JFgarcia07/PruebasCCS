@@ -3,7 +3,7 @@ import { go } from './core/router.js';
 import { state } from './core/state.js';
 import { onAudioFile, onAudioUrl } from './features/audio.js';
 import { onImportFile } from './features/exams.js';
-import { onInterviewChange } from './features/interviews.js';
+import { ivToggle, onInterviewChange } from './features/interviews.js';
 import { loadMine } from './features/reports.js';
 import { critTotal, onRubricKind } from './features/rubrics.js';
 import { markNav, saveAnswers } from './features/student.js';
@@ -36,6 +36,7 @@ document.addEventListener('change', async e => {
   const t = e.target;
   if (t.dataset.correct !== undefined) state.ed.questions[+t.dataset.q].correct = +t.dataset.correct;
   if (t.dataset.qid && state.run?.dirty) saveAnswers(); // al salir de un campo de texto se guarda ya
+  if (t.id === 'ivtype') return ivToggle();
   if (t.dataset.iv) return onInterviewChange(t);
   if (t.id === 'ivfilter') return go('interviews', t.value);
   if (t.dataset.rb === 'kind') return onRubricKind();

@@ -132,15 +132,20 @@ begin
   return jsonb_build_object('title', e.title, 'minutes', e.minutes, 'camera', e.camera);
 end $$;
 
-create or replace function public.student_start(p_code text, p_name text, p_token uuid default null)
+-- La firma cambió (ahora pide el correo): se elimina la anterior para que nadie la use.
+drop function if exists public.student_start(text, text, uuid);
+create or replace function public.student_start(p_code text, p_name text, p_email text, p_token uuid default null)
 returns jsonb language plpgsql security definer set search_path = public, extensions as $$
-declare e public.exams; a public.attempts; ord jsonb; r record;
+declare e public.exams; a public.attempts; ord jsonb; r record; ek text;
 begin
   select * into e from public.exams where code = upper(btrim(p_code));
   if not found then raise exception 'Código no encontrado'; end if;
   if btrim(coalesce(p_name, '')) = '' then raise exception 'Escribe tu nombre'; end if;
+  ek := lower(btrim(coalesce(p_email, '')));
+  if length(ek) > 200 or ek !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' then raise exception 'Escribe un correo electrónico válido'; end if;
 
-  select * into a from public.attempts where exam_id = e.id and name_key = public._norm(p_name);
+  -- Un intento por correo y examen (la identidad del estudiante es su correo).
+  select * into a from public.attempts where exam_id = e.id and email_key = ek;
   if found then
     if a.ended_at is not null or p_token is distinct from a.token then
       raise exception 'Ya presentaste este examen';
@@ -156,8 +161,8 @@ begin
   else
     select jsonb_agg(q->>'id' order by case when e.shuffle then random() else n end)
       into ord from jsonb_array_elements(e.questions) with ordinality t(q, n);
-    insert into public.attempts (exam_id, student_name, name_key, q_order)
-      values (e.id, btrim(p_name), public._norm(p_name), coalesce(ord, '[]')) returning * into a;
+    insert into public.attempts (exam_id, student_name, name_key, email, email_key, q_order)
+      values (e.id, left(btrim(p_name), 150), public._norm(p_name), left(btrim(p_email), 200), ek, coalesce(ord, '[]')) returning * into a;
   end if;
 
   return jsonb_build_object(
@@ -223,10 +228,10 @@ end $$;
 
 -- ---------- Permisos ----------
 revoke all on function public._norm(text), public._grade(jsonb, jsonb), public._attempt(uuid, uuid) from public, anon, authenticated;
-revoke all on function public.student_exam_info(text), public.student_start(text, text, uuid),
+revoke all on function public.student_exam_info(text), public.student_start(text, text, text, uuid),
   public.student_save(uuid, uuid, jsonb), public.student_flag(uuid, uuid, text),
   public.student_shot(uuid, uuid, text), public.student_submit(uuid, uuid, jsonb) from public;
-grant execute on function public.student_exam_info(text), public.student_start(text, text, uuid),
+grant execute on function public.student_exam_info(text), public.student_start(text, text, text, uuid),
   public.student_save(uuid, uuid, jsonb), public.student_flag(uuid, uuid, text),
   public.student_shot(uuid, uuid, text), public.student_submit(uuid, uuid, jsonb) to anon, authenticated;
 
@@ -458,3 +463,121 @@ alter table public.interviews enable row level security;
 drop policy if exists interviews_owner on public.interviews;
 create policy interviews_owner on public.interviews for all to authenticated
   using (owner = auth.uid()) with check (owner = auth.uid());
+
+
+-- =====================================================================
+-- ROLES (ADMIN / MAESTRO), CORREO DEL ESTUDIANTE, ENTREVISTAS DE LA ADMINISTRACIÓN Y NOTAS A MANO
+-- Ejecutar esta sección es seguro aunque ya hayas corrido lo anterior.
+--
+-- IMPORTANTE: después de ejecutarla, nombra a la administración (una vez, por correo):
+--   update public.profiles set role = 'admin' where email = 'correo.de.la.administracion@colegio.edu';
+-- Todas las demás cuentas son 'teacher' (maestro) por defecto.
+-- =====================================================================
+
+-- Perfiles: un rol por cuenta. Nadie puede cambiar su propio rol desde la app (no hay política de escritura).
+create table if not exists public.profiles (
+  id         uuid primary key references auth.users(id) on delete cascade,
+  email      text not null default '',
+  name       text not null default '',
+  role       text not null default 'teacher' check (role in ('admin', 'teacher')),
+  created_at timestamptz not null default now()
+);
+insert into public.profiles (id, email) select id, coalesce(email, '') from auth.users on conflict (id) do nothing;
+
+create or replace function public.handle_new_user() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  insert into public.profiles (id, email) values (new.id, coalesce(new.email, '')) on conflict (id) do nothing;
+  return new;
+end $$;
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created after insert on auth.users for each row execute function public.handle_new_user();
+
+create or replace function public.is_admin() returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+$$;
+revoke all on function public.is_admin() from public, anon;
+grant execute on function public.is_admin() to authenticated;
+
+alter table public.profiles enable row level security;
+drop policy if exists profiles_select on public.profiles;
+create policy profiles_select on public.profiles for select to authenticated using (id = auth.uid() or public.is_admin());
+
+-- Exámenes: cada maestro ve y edita los suyos; la administración los ve todos (solo lectura).
+drop policy if exists exams_owner on public.exams;
+drop policy if exists exams_select on public.exams;
+create policy exams_select on public.exams for select to authenticated using (owner = auth.uid() or public.is_admin());
+drop policy if exists exams_insert on public.exams;
+create policy exams_insert on public.exams for insert to authenticated with check (owner = auth.uid());
+drop policy if exists exams_update on public.exams;
+create policy exams_update on public.exams for update to authenticated using (owner = auth.uid()) with check (owner = auth.uid());
+drop policy if exists exams_delete on public.exams;
+create policy exams_delete on public.exams for delete to authenticated using (owner = auth.uid());
+
+-- Intentos y fotos: el dueño del examen y la administración.
+drop policy if exists attempts_owner_select on public.attempts;
+create policy attempts_owner_select on public.attempts for select to authenticated
+  using (public.is_admin() or exists (select 1 from public.exams e where e.id = exam_id and e.owner = auth.uid()));
+drop policy if exists shots_owner_select on public.shots;
+create policy shots_owner_select on public.shots for select to authenticated
+  using (public.is_admin() or exists (select 1 from public.attempts a join public.exams e on e.id = a.exam_id
+                 where a.id = attempt_id and e.owner = auth.uid()));
+
+-- Rúbricas: el maestro crea las de examen y reporte; las de entrevista solo la administración (y las ve toda ella).
+drop policy if exists rubrics_owner on public.rubrics;
+drop policy if exists rubrics_select on public.rubrics;
+create policy rubrics_select on public.rubrics for select to authenticated
+  using (owner = auth.uid() or (kind = 'interview' and public.is_admin()));
+drop policy if exists rubrics_insert on public.rubrics;
+create policy rubrics_insert on public.rubrics for insert to authenticated
+  with check (owner = auth.uid() and (kind <> 'interview' or public.is_admin()));
+drop policy if exists rubrics_update on public.rubrics;
+create policy rubrics_update on public.rubrics for update to authenticated
+  using (owner = auth.uid() or (kind = 'interview' and public.is_admin()))
+  with check ((owner = auth.uid() or public.is_admin()) and (kind <> 'interview' or public.is_admin()));
+drop policy if exists rubrics_delete on public.rubrics;
+create policy rubrics_delete on public.rubrics for delete to authenticated
+  using (owner = auth.uid() or (kind = 'interview' and public.is_admin()));
+
+-- Estudiante: correo del intento (un intento por correo y examen). Los intentos antiguos quedan sin correo.
+alter table public.attempts add column if not exists email text;
+alter table public.attempts add column if not exists email_key text;
+alter table public.attempts drop constraint if exists attempts_exam_id_name_key_key;
+create unique index if not exists attempts_exam_email_uq on public.attempts(exam_id, email_key) where email_key is not null;
+
+-- Notas modificadas a mano por la administración (se conserva la nota automática original).
+alter table public.attempts add column if not exists score_auto numeric;
+alter table public.attempts add column if not exists score_edited_by uuid references auth.users(id) on delete set null;
+alter table public.attempts add column if not exists score_edited_at timestamptz;
+
+create or replace function public.admin_set_score(p_attempt uuid, p_score numeric) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare a public.attempts;
+begin
+  if not public.is_admin() then raise exception 'Solo la administración puede modificar notas'; end if;
+  select * into a from public.attempts where id = p_attempt;
+  if not found then raise exception 'Intento no encontrado'; end if;
+  if a.ended_at is null then raise exception 'El examen sigue en curso'; end if;
+  if p_score is null or p_score < 0 or p_score > coalesce(a.max_score, 0) then
+    raise exception 'La nota debe estar entre 0 y %', coalesce(a.max_score, 0);
+  end if;
+  update public.attempts set score_auto = coalesce(score_auto, score), score = p_score,
+         score_edited_by = auth.uid(), score_edited_at = now() where id = a.id;
+  return jsonb_build_object('score', p_score);
+end $$;
+revoke all on function public.admin_set_score(uuid, numeric) from public, anon;
+grant execute on function public.admin_set_score(uuid, numeric) to authenticated;
+
+-- Entrevistas: solo la administración. Alumno: nombre, grado, edad, encargado. Padre: nombre, hijo/a, edad, correo.
+-- Siempre: entrevistado (subject_name) y entrevistador.
+alter table public.interviews add column if not exists interviewer text not null default '';
+alter table public.interviews add column if not exists grade text;
+alter table public.interviews add column if not exists age int;
+alter table public.interviews add column if not exists guardian text;
+alter table public.interviews add column if not exists child_name text;
+alter table public.interviews add column if not exists email text;
+drop policy if exists interviews_owner on public.interviews;
+drop policy if exists interviews_admin on public.interviews;
+create policy interviews_admin on public.interviews for all to authenticated
+  using (public.is_admin()) with check (public.is_admin());

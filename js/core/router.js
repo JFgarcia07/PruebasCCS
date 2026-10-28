@@ -1,7 +1,7 @@
 /* Navegación: cambia de pantalla cargando datos y pintando la vista. Las vistas viven en features/*. */
 import { sb } from './config.js';
 import { cleanupRun } from './run.js';
-import { state } from './state.js';
+import { isAdmin, state } from './state.js';
 import { toast } from './ui.js';
 import { $ } from './util.js';
 
@@ -15,6 +15,7 @@ export async function go(view, p) {
   try {
     if (!sb && view !== 'home') view = 'setup';
     if (['teacher', 'results', 'editor', 'rubrics', 'rubedit', 'reports', 'repedit', 'repview', 'interviews'].includes(view) && !state.session) view = 'auth';
+    if (view === 'interviews' && !isAdmin()) view = 'teacher'; // las entrevistas son de la administración
     let data = p;
     if (registry.loaders[view]) { app.innerHTML = '<div class="loading">Cargando…</div>'; data = await registry.loaders[view](p); }
     if (my !== state.gen) return;
@@ -25,7 +26,7 @@ export async function go(view, p) {
 export function redraw(view) { const y = scrollY; render(view); scrollTo(0, y); }
 export function nav() {
   $('#topnav').innerHTML = state.session
-    ? '<a href="#" data-act="teacher">Mis exámenes</a><a href="#" data-act="reports">Reportes</a><a href="#" data-act="rubrics">Rúbricas</a><a href="#" data-act="interviews">Entrevistas</a><a href="#" data-act="results">Resultados</a><a href="#" data-act="logout">Cerrar sesión</a>'
+    ? '<a href="#" data-act="teacher">Mis exámenes</a><a href="#" data-act="reports">Reportes</a><a href="#" data-act="rubrics">Rúbricas</a>' + (isAdmin() ? '<a href="#" data-act="interviews">Entrevistas</a>' : '') + '<a href="#" data-act="results">Resultados</a><a href="#" data-act="logout">Cerrar sesión</a>'
     : '<a href="#" data-act="join">Presentar examen</a><a href="#" data-act="tlogin">Profesores</a>';
 }
 export function render(view, p) { nav(); app.innerHTML = registry.views[view](p); }
