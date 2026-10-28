@@ -14,7 +14,7 @@ export async function go(view, p) {
   const my = ++state.gen;
   try {
     if (!sb && view !== 'home') view = 'setup';
-    if (['teacher', 'results', 'editor', 'rubrics', 'rubedit', 'reports', 'repedit', 'repview'].includes(view) && !state.session) view = 'auth';
+    if (['teacher', 'results', 'editor', 'rubrics', 'rubedit', 'reports', 'repedit', 'repview', 'interviews'].includes(view) && !state.session) view = 'auth';
     let data = p;
     if (registry.loaders[view]) { app.innerHTML = '<div class="loading">Cargando…</div>'; data = await registry.loaders[view](p); }
     if (my !== state.gen) return;
@@ -25,7 +25,7 @@ export async function go(view, p) {
 export function redraw(view) { const y = scrollY; render(view); scrollTo(0, y); }
 export function nav() {
   $('#topnav').innerHTML = state.session
-    ? '<a href="#" data-act="teacher">Mis exámenes</a><a href="#" data-act="reports">Reportes</a><a href="#" data-act="rubrics">Rúbricas</a><a href="#" data-act="results">Resultados</a><a href="#" data-act="logout">Cerrar sesión</a>'
+    ? '<a href="#" data-act="teacher">Mis exámenes</a><a href="#" data-act="reports">Reportes</a><a href="#" data-act="rubrics">Rúbricas</a><a href="#" data-act="interviews">Entrevistas</a><a href="#" data-act="results">Resultados</a><a href="#" data-act="logout">Cerrar sesión</a>'
     : '<a href="#" data-act="join">Presentar examen</a><a href="#" data-act="tlogin">Profesores</a>';
 }
 export function render(view, p) { nav(); app.innerHTML = registry.views[view](p); }

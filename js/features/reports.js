@@ -8,7 +8,7 @@ import { ask, toast } from '../core/ui.js';
 import { esc, fdate, norm } from '../core/util.js';
 
 export const loaders = {
-  async repedit() { state.cache.rubrics = await q(sb.from('rubrics').select('*').order('name')); },
+  async repedit() { state.cache.rubrics = await q(sb.from('rubrics').select('id,name,kind,levels').eq('kind', 'report').order('name')); },
   async reports() {
     const [reports, ents] = await Promise.all([
       q(sb.from('reports').select('*').order('created_at', { ascending: false })),

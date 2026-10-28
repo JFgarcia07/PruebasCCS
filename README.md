@@ -41,3 +41,8 @@ Módulos ES nativos: no hay paso de compilación; Live Server, Netlify o Cloudfl
 - `features/`: un archivo por área; cada uno exporta sus `views`, `loaders` (datos que cargan) y `acts` (acciones de los botones `data-act`).
   `auth` · `exams` · `rubrics` · `reports` · `results` · `student` · `audio`.
 - Para añadir una pantalla nueva: crea el archivo en `features/`, exporta `views` / `loaders` / `acts` y añádelo en la lista de `main.js`.
+
+## Rúbricas por tipo y entrevistas
+- **Rúbricas** tiene tres pestañas: *Examen* y *Reporte* (niveles según el porcentaje; cada una se asigna en su editor) y *Entrevista* (criterios con valor máximo).
+- **Entrevistas** (menú): eliges una rúbrica de entrevista y llenas la tabla entrevistados × criterios (alumnos o padres de familia). El total se calcula solo y cada nota se guarda al salir de la casilla.
+- Requiere volver a ejecutar `supabase/schema.sql` (sección final: columnas `kind`/`criteria` y tabla `interviews`). Las rúbricas existentes quedan como *Examen*, salvo las que solo usan reportes, que pasan a *Reporte*.

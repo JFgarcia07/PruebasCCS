@@ -17,7 +17,7 @@ export const loaders = {
     const counts = {}; att.forEach(a => counts[a.exam_id] = Number(a.n));
     return { exams, counts };
   },
-  async editor() { state.cache.rubrics = await q(sb.from('rubrics').select('*').order('name')); }
+  async editor() { state.cache.rubrics = await q(sb.from('rubrics').select('id,name,kind,levels').eq('kind', 'exam').order('name')); }
 };
 
 export const views = {

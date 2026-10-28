@@ -3,14 +3,19 @@ import { go } from './core/router.js';
 import { state } from './core/state.js';
 import { onAudioFile, onAudioUrl } from './features/audio.js';
 import { onImportFile } from './features/exams.js';
+import { onInterviewChange } from './features/interviews.js';
 import { loadMine } from './features/reports.js';
+import { critTotal, onRubricKind } from './features/rubrics.js';
 import { markNav, saveAnswers } from './features/student.js';
 
 document.addEventListener('input', e => {
   const t = e.target;
   if (t.dataset.rp) state.rp[t.dataset.rp] = t.value;
   else if (t.dataset.rf) state.rf[t.dataset.rf] = t.value;
-  else if (t.dataset.lf) state.rb.levels[+t.dataset.l][t.dataset.lf] = t.value;
+  else if (t.dataset.cf) {
+    state.rb.criteria[+t.dataset.c][t.dataset.cf] = t.value;
+    if (t.dataset.cf === 'max') { const tt = document.getElementById('crittotal'); if (tt) tt.textContent = critTotal(state.rb.criteria); }
+  } else if (t.dataset.lf) state.rb.levels[+t.dataset.l][t.dataset.lf] = t.value;
   else if (t.dataset.rb) state.rb[t.dataset.rb] = t.value;
   else if (t.dataset.e) state.ed[t.dataset.e] = t.type === 'checkbox' ? t.checked : t.type === 'number' ? Math.max(1, +t.value || 1) : t.value;
   else if (t.dataset.f) {
@@ -31,6 +36,9 @@ document.addEventListener('change', async e => {
   const t = e.target;
   if (t.dataset.correct !== undefined) state.ed.questions[+t.dataset.q].correct = +t.dataset.correct;
   if (t.dataset.qid && state.run?.dirty) saveAnswers(); // al salir de un campo de texto se guarda ya
+  if (t.dataset.iv) return onInterviewChange(t);
+  if (t.id === 'ivfilter') return go('interviews', t.value);
+  if (t.dataset.rb === 'kind') return onRubricKind();
   if (t.id === 'resfilter') go('results', t.value);
   if (t.dataset.rf === 'course') loadMine();
   if (t.dataset.afile !== undefined && t.files[0]) return onAudioFile(t);

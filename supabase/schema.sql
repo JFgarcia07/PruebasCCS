@@ -423,3 +423,38 @@ begin
 end $$;
 revoke all on function public.purge_old_shots(int) from public, anon;
 grant execute on function public.purge_old_shots(int) to authenticated;
+
+
+-- =====================================================================
+-- RÚBRICAS POR TIPO (examen / reporte / entrevista) Y ENTREVISTAS
+-- Ejecutar esta sección es seguro aunque ya hayas corrido lo anterior.
+-- =====================================================================
+alter table public.rubrics add column if not exists kind text not null default 'exam';
+alter table public.rubrics drop constraint if exists rubrics_kind_check;
+alter table public.rubrics add constraint rubrics_kind_check check (kind in ('exam', 'report', 'interview'));
+-- Rúbrica de entrevista: criterios con valor máximo: [{id, name, description, max}]
+alter table public.rubrics add column if not exists criteria jsonb not null default '[]';
+
+-- Las rúbricas que hoy usan solo reportes pasan a ser de tipo reporte (las demás quedan como examen).
+update public.rubrics set kind = 'report'
+ where kind = 'exam'
+   and id in (select rubric_id from public.reports where rubric_id is not null)
+   and id not in (select rubric_id from public.exams where rubric_id is not null);
+
+-- Entrevistas: una fila por entrevistado; scores = { criterioId: nota }
+create table if not exists public.interviews (
+  id           uuid primary key default gen_random_uuid(),
+  owner        uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  rubric_id    uuid not null references public.rubrics(id) on delete cascade,
+  subject_name text not null,
+  subject_type text not null default 'alumno' check (subject_type in ('alumno', 'padre')),
+  scores       jsonb not null default '{}',
+  notes        text not null default '',
+  created_at   timestamptz not null default now()
+);
+create index if not exists interviews_rubric_idx on public.interviews(rubric_id, created_at);
+create index if not exists rubrics_owner_kind_idx on public.rubrics(owner, kind);
+alter table public.interviews enable row level security;
+drop policy if exists interviews_owner on public.interviews;
+create policy interviews_owner on public.interviews for all to authenticated
+  using (owner = auth.uid()) with check (owner = auth.uid());
