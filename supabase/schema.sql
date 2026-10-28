@@ -524,18 +524,18 @@ create policy shots_owner_select on public.shots for select to authenticated
   using (public.is_admin() or exists (select 1 from public.attempts a join public.exams e on e.id = a.exam_id
                  where a.id = attempt_id and e.owner = auth.uid()));
 
--- Rúbricas: el maestro crea las de examen y reporte; las de entrevista solo la administración (y las ve toda ella).
+-- Rúbricas: el maestro crea solo las de examen; la administración crea las de todos los tipos (y ve todas las de entrevista).
 drop policy if exists rubrics_owner on public.rubrics;
 drop policy if exists rubrics_select on public.rubrics;
 create policy rubrics_select on public.rubrics for select to authenticated
   using (owner = auth.uid() or (kind = 'interview' and public.is_admin()));
 drop policy if exists rubrics_insert on public.rubrics;
 create policy rubrics_insert on public.rubrics for insert to authenticated
-  with check (owner = auth.uid() and (kind <> 'interview' or public.is_admin()));
+  with check (owner = auth.uid() and (kind = 'exam' or public.is_admin()));
 drop policy if exists rubrics_update on public.rubrics;
 create policy rubrics_update on public.rubrics for update to authenticated
   using (owner = auth.uid() or (kind = 'interview' and public.is_admin()))
-  with check ((owner = auth.uid() or public.is_admin()) and (kind <> 'interview' or public.is_admin()));
+  with check ((owner = auth.uid() or public.is_admin()) and (kind = 'exam' or public.is_admin()));
 drop policy if exists rubrics_delete on public.rubrics;
 create policy rubrics_delete on public.rubrics for delete to authenticated
   using (owner = auth.uid() or (kind = 'interview' and public.is_admin()));

@@ -15,8 +15,8 @@ const HELP = {
   interview: 'Lista de criterios con su valor máximo. Se usa en Entrevistas (con alumnos o padres de familia): llenas una tabla con la nota de cada criterio.'
 };
 const kindOf = r => r.kind || 'exam';
-/* Tipos que puede crear quien tiene la sesión: las de entrevista son solo de la administración */
-const tabKinds = () => isAdmin() ? KINDS : KINDS.filter(k => k[0] !== 'interview');
+/* Tipos que puede crear quien tiene la sesión: el maestro solo las de examen; la administración todas */
+const tabKinds = () => isAdmin() ? KINDS : KINDS.filter(k => k[0] === 'exam');
 const curTab = () => tabKinds().some(k => k[0] === state.rubTab) ? state.rubTab : 'exam';
 const newCrit = () => ({ id: uid(), name: '', description: '', max: 10 });
 const defaultLevels = () => LEVELS.map(({ min, name, cls, text }) => ({ min, name, cls, text }));
@@ -36,8 +36,8 @@ export const views = {
     return `
     <div class="row" style="margin-bottom:1rem"><h2 class="grow" style="margin:0">Rúbricas</h2>
       <button data-act="newrubric">＋ Nueva rúbrica de ${label}</button></div>
-    <div class="row" style="margin-bottom:.6rem">${tabKinds().map(([k, n]) =>
-      `<button class="sm ${k === tab ? '' : 'sec'}" data-act="rubtab" data-k="${k}">${n} (${all.filter(r => kindOf(r) === k).length})</button>`).join('')}</div>
+    ${tabKinds().length > 1 ? `<div class="row" style="margin-bottom:.6rem">${tabKinds().map(([k, n]) =>
+      `<button class="sm ${k === tab ? '' : 'sec'}" data-act="rubtab" data-k="${k}">${n} (${all.filter(r => kindOf(r) === k).length})</button>`).join('')}</div>` : ''}
     <p class="mut">${HELP[tab]}</p>
     ${list.length ? list.map(r => `<div class="card ex-card"><div class="grow"><h3 style="margin-bottom:.2rem">${esc(r.name)}</h3>
         <div class="tags">${tab === 'interview'
