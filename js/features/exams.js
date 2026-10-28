@@ -29,7 +29,7 @@ export const views = {
       <input type="file" id="impfile" accept=".json" hidden></div>
     ${exams.length ? exams.map(e => `<div class="card ex-card"><div class="grow"><h3 style="margin-bottom:.2rem">${esc(e.title)}</h3>
         <div class="tags"><span class="tag">Código <span class="code">${esc(e.code)}</span></span>
-        <span class="tag">⏱ ${e.minutes} min</span><span class="tag">${e.n_questions} preguntas</span>
+        <span class="tag">⏱ ${e.minutes} min</span><span class="tag">${e.n_questions} preguntas</span><span class="tag ok" title="Lo que vale el examen: suma de los puntos de sus preguntas">${e.total_points} pts</span>
         ${e.camera ? '<span class="tag warn">📷 cámara</span>' : ''}<span class="tag ok">${counts[e.id] || 0} intentos</span></div></div>
         <div class="row"><button class="sm sec" data-act="copylink" data-code="${esc(e.code)}">🔗 Copiar enlace</button>
         <button class="sm" data-act="edit" data-id="${e.id}">Editar</button>
@@ -40,7 +40,7 @@ export const views = {
   editor: () => {
     const e = state.ed;
     return `
-    <div class="row" style="margin-bottom:1rem"><h2 class="grow" style="margin:0">${e._new ? 'Nuevo examen' : 'Editar examen'}</h2>
+    <div class="row" style="margin-bottom:1rem"><h2 class="grow" style="margin:0">${e._new ? 'Nuevo examen' : 'Editar examen'}</h2><span class="tag ok" id="extotal" title="Suma de los puntos de todas las preguntas">Valor del examen: ${examTotal(e.questions)} pts</span>
       <button class="ghost" data-act="teacher">Cancelar</button><button data-act="saveexam">Guardar examen</button></div>
     <div class="card"><div class="grid">
       <div><label>Título</label><input data-e="title" value="${esc(e.title)}" placeholder="Ej. Parcial de Matemática"></div>
@@ -99,7 +99,7 @@ export const acts = {
     try { await navigator.clipboard.writeText(url); toast('Enlace copiado', 'ok'); } catch { prompt('Copia el enlace:', url); }
   },
   exportexam: async el => {
-    const { id, owner, created_at, rubric_id, n_questions, ...x } = await fullExam(el.dataset.id);
+    const { id, owner, created_at, rubric_id, n_questions, total_points, ...x } = await fullExam(el.dataset.id);
     download('examen.json', JSON.stringify(x, null, 1), 'application/json');
   },
   importexam: () => $('#impfile').click(),
@@ -141,6 +141,9 @@ export const acts = {
   }
 };
 
+/* Lo que vale el examen: suma de los puntos de sus preguntas */
+export const examTotal = qs => Math.round(qs.reduce((a, x) => a + (+x.points || 0), 0) * 100) / 100;
+export function refreshExamTotal() { const t = document.getElementById('extotal'); if (t) t.textContent = `Valor del examen: ${examTotal(state.ed.questions)} pts`; }
 export function qHTML(x, i) {
   return `<div class="card qcard"><div class="row"><span class="qnum">${i + 1}</span><span class="tag">${x.type === 'mc' ? 'Opción múltiple' : 'Respuesta corta'}</span><span class="grow"></span>
     <span class="mut">Puntos</span><input style="width:80px" type="number" min="0" step="0.5" data-q="${i}" data-f="points" value="${x.points}">

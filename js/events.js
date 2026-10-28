@@ -2,7 +2,7 @@
 import { go } from './core/router.js';
 import { state } from './core/state.js';
 import { onAudioFile, onAudioUrl } from './features/audio.js';
-import { onImportFile } from './features/exams.js';
+import { onImportFile, refreshExamTotal } from './features/exams.js';
 import { onCoevalInput, onCoevFilter } from './features/coeval.js';
 import { ivToggle, onInterviewChange } from './features/interviews.js';
 import { onRepFilter, onRepRubric } from './features/reports.js';
@@ -23,7 +23,7 @@ document.addEventListener('input', e => {
   else if (t.dataset.f) {
     const x = state.ed.questions[+t.dataset.q];
     if (t.dataset.f === 'answers') x.answers = t.value.split('|').map(s => s.trim()).filter(Boolean);
-    else if (t.dataset.f === 'points') x.points = Math.max(0, +t.value || 0);
+    else if (t.dataset.f === 'points') { x.points = Math.max(0, +t.value || 0); refreshExamTotal(); }
     else if (t.dataset.f === 'plays') x.plays = Math.max(0, Math.floor(+t.value || 0));
     else x[t.dataset.f] = t.value;
   } else if (t.dataset.o !== undefined) state.ed.questions[+t.dataset.q].options[+t.dataset.o] = t.value;

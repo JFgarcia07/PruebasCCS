@@ -359,13 +359,19 @@ grant execute on function public.report_info(text), public.report_submit(text, t
 -- Número de preguntas guardado aparte: el listado de exámenes ya no descarga las preguntas
 -- (con audios incrustados pueden pesar varios MB por examen).
 alter table public.exams add column if not exists n_questions int not null default 0;
+alter table public.exams add column if not exists total_points numeric not null default 0;   -- lo que vale el examen (suma de sus preguntas)
 
 create or replace function public._exam_count() returns trigger language plpgsql as $$
-begin new.n_questions := jsonb_array_length(new.questions); return new; end $$;
+begin
+  new.n_questions := jsonb_array_length(new.questions);
+  new.total_points := coalesce((select sum(coalesce((q->>'points')::numeric, 1)) from jsonb_array_elements(new.questions) q), 0);
+  return new;
+end $$;
 drop trigger if exists exams_count on public.exams;
 create trigger exams_count before insert or update of questions on public.exams
   for each row execute function public._exam_count();
 update public.exams set n_questions = jsonb_array_length(questions) where n_questions = 0;
+update public.exams set questions = questions where total_points = 0 and n_questions > 0;   -- recalcula el valor de los exámenes existentes
 
 create index if not exists exams_owner_idx on public.exams(owner, created_at desc);
 create index if not exists attempts_started_idx on public.attempts(exam_id, started_at desc);
