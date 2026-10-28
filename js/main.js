@@ -11,11 +11,12 @@ import * as rubrics from './features/rubrics.js';
 import * as reports from './features/reports.js';
 import * as results from './features/results.js';
 import * as interviews from './features/interviews.js';
+import * as coeval from './features/coeval.js';
 import * as student from './features/student.js';
 import './events.js';
 import './features/audio.js';
 
-for (const f of [auth, exams, rubrics, reports, results, interviews, student]) {
+for (const f of [auth, exams, rubrics, reports, results, interviews, coeval, student]) {
   Object.assign(registry.views, f.views);
   Object.assign(registry.loaders, f.loaders);
   Object.assign(registry.acts, f.acts);

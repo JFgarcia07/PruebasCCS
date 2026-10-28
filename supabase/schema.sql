@@ -581,3 +581,120 @@ drop policy if exists interviews_owner on public.interviews;
 drop policy if exists interviews_admin on public.interviews;
 create policy interviews_admin on public.interviews for all to authenticated
   using (public.is_admin()) with check (public.is_admin());
+
+
+-- =====================================================================
+-- COEVALUACIÓN DOCENTE (solo la administración la crea y la ve; los docentes responden sin cuenta, vía RPC)
+-- Misma mecánica que los reportes de estudiante. La rúbrica (criterios x niveles) se guarda copiada en cada coevaluación.
+-- Ejecutar esta sección es seguro aunque ya hayas corrido lo anterior.
+-- =====================================================================
+create table if not exists public.coevals (
+  id           uuid primary key default gen_random_uuid(),
+  owner        uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  title        text not null,
+  student_name text not null,
+  grade_level  text not null default '',
+  period       text not null default '',
+  code         text not null unique,
+  courses      jsonb not null default '[]',
+  rubric       jsonb not null,   -- {levels:[{v,name}], sections:[{id,name,points,criteria:[{id,name,desc:{4,3,2,1}}]}]}
+  created_at   timestamptz not null default now()
+);
+create table if not exists public.coeval_entries (
+  id           uuid primary key default gen_random_uuid(),
+  coeval_id    uuid not null references public.coevals(id) on delete cascade,
+  course       text not null,
+  course_key   text not null,
+  teacher_name text not null,
+  scores       jsonb not null,   -- { "A.respeto": 4, ... }
+  comment      text not null default '',
+  token        uuid not null default gen_random_uuid(),
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now(),
+  unique (coeval_id, course_key)
+);
+create index if not exists coevals_created_idx on public.coevals(created_at desc);
+
+alter table public.coevals enable row level security;
+alter table public.coeval_entries enable row level security;
+drop policy if exists coevals_admin on public.coevals;
+create policy coevals_admin on public.coevals for all to authenticated using (public.is_admin()) with check (public.is_admin());
+drop policy if exists coeval_entries_admin_select on public.coeval_entries;
+create policy coeval_entries_admin_select on public.coeval_entries for select to authenticated using (public.is_admin());
+drop policy if exists coeval_entries_admin_delete on public.coeval_entries;
+create policy coeval_entries_admin_delete on public.coeval_entries for delete to authenticated using (public.is_admin());
+
+create or replace function public.coeval_info(p_code text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare c public.coevals;
+begin
+  select * into c from public.coevals where code = upper(btrim(p_code));
+  if not found then raise exception 'Coevaluación no encontrada'; end if;
+  return jsonb_build_object('title', c.title, 'student_name', c.student_name, 'grade_level', c.grade_level,
+    'period', c.period, 'courses', c.courses, 'rubric', c.rubric,
+    'filled', (select coalesce(jsonb_agg(course), '[]') from public.coeval_entries where coeval_id = c.id));
+end $$;
+
+create or replace function public.coeval_submit(p_code text, p_course text, p_teacher text, p_scores jsonb,
+                                                p_comment text, p_token uuid default null)
+returns jsonb language plpgsql security definer set search_path = public, extensions as $$
+declare c public.coevals; en public.coeval_entries; cn text; k text; listed text;
+        sec jsonb; cr jsonb; key text; v text; top int; clean jsonb := '{}';
+begin
+  select * into c from public.coevals where code = upper(btrim(p_code));
+  if not found then raise exception 'Coevaluación no encontrada'; end if;
+  cn := left(btrim(coalesce(p_course, '')), 100);
+  if cn = '' then raise exception 'Selecciona el curso'; end if;
+  if btrim(coalesce(p_teacher, '')) = '' then raise exception 'Escribe tu nombre'; end if;
+  if jsonb_array_length(c.courses) > 0 then
+    select x into listed from jsonb_array_elements_text(c.courses) x where public._norm(x) = public._norm(cn) limit 1;
+    if listed is null then raise exception 'Curso no válido para esta coevaluación'; end if;
+    cn := listed;
+  end if;
+  -- cada criterio de la rúbrica debe traer un nivel válido; lo demás se descarta
+  select max((l->>'v')::int) into top from jsonb_array_elements(c.rubric->'levels') l;
+  for sec in select * from jsonb_array_elements(c.rubric->'sections') loop
+    for cr in select * from jsonb_array_elements(sec->'criteria') loop
+      key := (sec->>'id') || '.' || (cr->>'id');
+      v := p_scores ->> key;
+      if v is null or v !~ '^[0-9]+$' or v::int < 1 or v::int > top then
+        raise exception 'Falta calificar el criterio: %', cr->>'name';
+      end if;
+      clean := clean || jsonb_build_object(key, v::int);
+    end loop;
+  end loop;
+  k := public._norm(cn);
+
+  select * into en from public.coeval_entries where coeval_id = c.id and course_key = k;
+  if found then
+    if p_token is distinct from en.token then raise exception 'Ese curso ya fue registrado por otro docente'; end if;
+    update public.coeval_entries
+       set teacher_name = left(btrim(p_teacher), 120), scores = clean, comment = left(coalesce(p_comment, ''), 2000), updated_at = now()
+     where id = en.id returning * into en;
+  else
+    if (select count(*) from public.coeval_entries where coeval_id = c.id) >= 100 then
+      raise exception 'Esta coevaluación ya alcanzó el máximo de registros';
+    end if;
+    insert into public.coeval_entries (coeval_id, course, course_key, teacher_name, scores, comment)
+      values (c.id, cn, k, left(btrim(p_teacher), 120), clean, left(coalesce(p_comment, ''), 2000))
+      returning * into en;
+  end if;
+  return jsonb_build_object('token', en.token, 'course', en.course);
+end $$;
+
+create or replace function public.coeval_my_entry(p_code text, p_course text, p_token uuid) returns jsonb
+language plpgsql security definer set search_path = public, extensions as $$
+declare c public.coevals; en public.coeval_entries;
+begin
+  select * into c from public.coevals where code = upper(btrim(p_code));
+  if not found then return null; end if;
+  select * into en from public.coeval_entries
+   where coeval_id = c.id and course_key = public._norm(p_course) and token = p_token;
+  if not found then return null; end if;
+  return jsonb_build_object('teacher', en.teacher_name, 'scores', en.scores, 'comment', en.comment);
+end $$;
+
+revoke all on function public.coeval_info(text), public.coeval_submit(text, text, text, jsonb, text, uuid),
+  public.coeval_my_entry(text, text, uuid) from public;
+grant execute on function public.coeval_info(text), public.coeval_submit(text, text, text, jsonb, text, uuid),
+  public.coeval_my_entry(text, text, uuid) to anon, authenticated;

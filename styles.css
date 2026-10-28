@@ -109,3 +109,19 @@ table.levels td{vertical-align:top;font-size:.92rem}
 table.levels tr.me{background:var(--acc-soft);outline:2px solid var(--acc);outline-offset:-2px}
 table.levels tbody tr:hover{background:inherit}
 button.sec{border:1px solid var(--line)}
+
+/* Coevaluación: rúbrica de criterios x niveles */
+table.rub{min-width:760px}
+table.rub th{vertical-align:middle;text-align:center;background:var(--pri);color:#fff;font-size:.8rem;text-transform:none;letter-spacing:0}
+table.rub th.crit{background:var(--pri-soft);color:var(--pri);text-align:left;font-size:.9rem;min-width:110px}
+table.rub td{padding:0;vertical-align:top;border:1px solid var(--line)}
+table.rub tbody tr:hover{background:inherit}
+.rcell{display:block;margin:0;font-weight:400;font-size:.85rem;cursor:pointer;position:relative;height:100%}
+.rcell input{position:absolute;opacity:0;width:1px;height:1px}
+.rcell span{display:block;padding:.6rem .7rem;height:100%;line-height:1.4}
+.rcell:hover span{background:var(--acc-soft)}
+.rcell input:checked+span{background:var(--pri);color:#fff}
+.rcell input:focus-visible+span{outline:3px solid var(--acc);outline-offset:-3px}
+.lv{display:inline-grid;place-items:center;min-width:1.9rem;height:1.9rem;border-radius:8px;font-weight:700;background:var(--bg);color:var(--mut)}
+.lv4{background:var(--ok-soft);color:var(--ok)}.lv3{background:#ecfccb;color:#4d7c0f}.lv2{background:var(--warn-soft);color:var(--warn)}.lv1{background:var(--bad-soft);color:var(--bad)}
+table.matrix tbody tr:hover{background:inherit}
