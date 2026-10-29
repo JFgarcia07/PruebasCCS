@@ -134,6 +134,7 @@ end $$;
 
 -- La firma cambió (ahora pide el correo): se elimina la anterior para que nadie la use.
 drop function if exists public.student_start(text, text, uuid);
+drop function if exists public.student_start(text, text, text, text, uuid);   -- versión con grado (ya no se usa)
 create or replace function public.student_start(p_code text, p_name text, p_email text, p_token uuid default null)
 returns jsonb language plpgsql security definer set search_path = public, extensions as $$
 declare e public.exams; a public.attempts; ord jsonb; r record; ek text;
