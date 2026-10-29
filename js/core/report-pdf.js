@@ -114,8 +114,8 @@ export async function reportPDF(s, sum, rubricName) {
 
   const cv = s.coeval;
   section('Coevaluación docente', cv ? 'Actualizada ' + fdate(cv.date).split(',')[0] : '', 5);
-  table([{ t: 'ÁREA', w: 270 }, { t: 'SUMA DE NIVELES', w: 100, r: 1 }, { t: 'PUNTOS', w: 90, r: 1 }, { t: '%', w: CW - 460, r: 1 }],
-    cv ? [...cv.parts.map(p => [p.name, `${p.raw} / ${p.max}`, `${p.points} / ${p.outOf}`, pc(p.points, p.outOf)]), ['Total coevaluación', '', `${cv.score} / ${cv.max}`, pc(cv.score, cv.max)]] : [], 'Sin coevaluación registrada.');
+  table([{ t: 'ÁREA', w: CW - 260 }, { t: 'PORCENTAJE', w: 120, r: 1 }, { t: 'PUNTOS', w: 140, r: 1 }],
+    cv ? [...cv.parts.map(p => [p.name, `${p.pct} %`, `${p.points} / ${p.outOf}`]), ['Total coevaluación', pc(cv.score, cv.max), `${cv.score} / ${cv.max}`]] : [], 'Sin coevaluación registrada.');
   if (cv && cv.comment) { const ls = wrap(cv.comment, CW - 16); need(ls.length * 12 + 34); font('bold', 9, GRAY); text('Comentario', M, y - 2); y += 10; font('normal', 9.5, INK); doc.text(ls, M + 8, y); y += ls.length * 12 + 14; }
 
   // Pie de página en todas las hojas

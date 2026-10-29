@@ -1,6 +1,7 @@
 /* Reporte automático de cada estudiante: junta todos sus exámenes, sus entrevistas y su coevaluación y los suma.
    Funciones puras (sin DOM ni red), para que la pantalla y el PDF muestren exactamente lo mismo. */
-import { cvScore, DEFAULT_COEVAL } from './coeval-rubric.js';
+import { cvScore } from './coeval-rubric.js';
+import { INTERVIEW_RUBRICS, interviewScore } from './interview-rubrics.js';
 import { levelFor } from './levels.js';
 import { norm } from './util.js';
 
@@ -8,10 +9,9 @@ const r2 = n => Math.round(n * 100) / 100;
 /* Un estudiante es su correo (o su nombre, en los intentos antiguos que no lo tienen), sin importar cuántos exámenes haya hecho */
 export const studentKey = a => a.email ? a.email.trim().toLowerCase() : 'n:' + norm(a.student_name);
 
-/* raw: { attempts, exams, interviews, rubrics (de entrevista), evals, overrides } → estudiantes ordenados por nombre */
+/* raw: { attempts, exams, interviews, evals, overrides } → estudiantes ordenados por nombre */
 export function buildStudents(raw) {
   const title = Object.fromEntries(raw.exams.map(e => [e.id, e.title]));
-  const rub = Object.fromEntries(raw.rubrics.map(r => [r.id, r]));
   const students = new Map(), byName = new Map();
   for (const a of raw.attempts) {   // vienen del más reciente al más antiguo: el nombre que se conserva es el último escrito
     const k = studentKey(a); let s = students.get(k);
@@ -24,16 +24,15 @@ export function buildStudents(raw) {
   }
   // Entrevistas: al alumno entrevistado por su nombre; al padre/madre, por el nombre de su hijo/a
   for (const i of raw.interviews) {
-    const r = rub[i.rubric_id]; if (!r || !r.criteria.length) continue;
-    const given = r.criteria.filter(c => i.scores[c.id] !== undefined && i.scores[c.id] !== null);
-    if (!given.length) continue;   // entrevista todavía sin notas
-    const item = { rubric: r.name, who: i.subject_type === 'padre' ? 'Padre / madre' : 'Alumno', interviewer: i.interviewer || '', date: i.created_at,
-      score: r2(r.criteria.reduce((a, c) => a + Math.min(+c.max, Math.max(0, +i.scores[c.id] || 0)), 0)), max: r2(r.criteria.reduce((a, c) => a + +c.max, 0)) };
+    const r = INTERVIEW_RUBRICS[i.subject_type]; if (!r) continue;
+    const sc = interviewScore(i.subject_type, i.scores);
+    if (!sc.done) continue;   // entrevista todavía sin notas
+    const item = { rubric: r.name, who: i.subject_type === 'padre' ? 'Padre / madre' : 'Alumno', interviewer: i.interviewer || '', date: i.held_on || i.created_at, score: sc.score, max: sc.max };
     for (const s of byName.get(norm(i.subject_type === 'padre' ? i.child_name : i.subject_name)) || []) s.interviews.push(item);
   }
   for (const e of raw.evals) {
     const s = students.get(e.student_key); if (!s) continue;
-    const c = cvScore(DEFAULT_COEVAL, e.scores);
+    const c = cvScore(e.scores);
     s.coeval = { parts: c.parts, score: c.total, max: c.outOf, comment: e.comment || '', date: e.updated_at };
   }
   for (const o of raw.overrides) { const s = students.get(o.student_key); if (s) s.override = o; }

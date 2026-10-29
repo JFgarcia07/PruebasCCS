@@ -41,10 +41,9 @@ Módulos ES nativos: no hay paso de compilación; Live Server, Netlify o Cloudfl
   `auth` · `exams` · `rubrics` · `reports` · `results` · `student` · `audio`.
 - Para añadir una pantalla nueva: crea el archivo en `features/`, exporta `views` / `loaders` / `acts` y añádelo en la lista de `main.js`.
 
-## Rúbricas por tipo y entrevistas
-- **Rúbricas** tiene tres pestañas: *Examen* y *Reporte* (niveles según el porcentaje; cada una se asigna en su editor) y *Entrevista* (criterios con valor máximo).
-- **Entrevistas** (menú): eliges una rúbrica de entrevista y llenas la tabla entrevistados × criterios (alumnos o padres de familia). El total se calcula solo y cada nota se guarda al salir de la casilla.
-- Requiere volver a ejecutar `supabase/schema.sql` (sección final: columnas `kind`/`criteria` y tabla `interviews`). Las rúbricas existentes quedan como *Examen*, salvo las que solo usan reportes, que pasan a *Reporte*.
+## Rúbricas
+- **Rúbricas** (menú) tiene dos tipos, ambos con niveles según el porcentaje: *Examen* (mensaje que ve el estudiante) y *Reporte* (interpreta el total del informe de Reportes; la crea la administración). El maestro solo crea las de examen.
+- Las rúbricas de **entrevista** ya no se crean: son las dos del colegio (a padres de familia y al estudiante, 15 puntos cada una) y viven en `js/core/interview-rubrics.js`.
 
 ## Roles
 - **Maestro** (por defecto en toda cuenta nueva): crea sus exámenes y sus rúbricas (solo de tipo examen; las puede usar también en sus reportes); ve solo los resultados de sus propios exámenes.
@@ -54,7 +53,6 @@ Módulos ES nativos: no hay paso de compilación; Live Server, Netlify o Cloudfl
 - **Estudiante**: para entrar al examen escribe código, nombre y correo. Hay un intento por correo y examen.
 - Entrevistas: siempre llevan entrevistado y entrevistador. Alumno: nombre, grado, edad y encargado. Padre/madre: nombre, hijo/a, edad y correo.
 
-## Coevaluación docente (solo administración)
-- Menú **Coevaluación**: lista de todos los estudiantes que han presentado algún examen (sin importar cuál). La administración pulsa *Evaluar* y califica ahí mismo, de 1 a 4, los 12 criterios de la rúbrica por defecto: *Comportamiento* (6 criterios, 10 pts) y *Académico* (6 criterios, 10 pts). Puntos de cada sección = suma de niveles ÷ máximo × 10; total sobre 20.
-- Una evaluación por estudiante (por su correo); se puede editar o quitar. Hay búsqueda y filtro de pendientes/evaluados. No genera PDF.
-- La rúbrica está en `js/core/coeval-rubric.js`.
+## Entrevistas y coevaluación (solo administración)
+- **Entrevistas**: proceso de admisión, con las dos rúbricas fijas (5 criterios de 0 a 3 puntos, total 15). La administración abre una entrevista nueva (al estudiante o a padres), llena los datos (entrevistado, estudiante, grado, edad, encargado o correo, fecha, entrevistador), marca el nivel de cada criterio y el total se calcula solo.
+- **Coevaluación**: lista de todos los estudiantes que han presentado algún examen. La administración escribe a mano el **porcentaje** de *Comportamiento* y de *Académico* (por ejemplo 80) y el sistema lo divide entre 10: puntos sobre 10 cada uno, total sobre 20.

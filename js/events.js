@@ -4,20 +4,18 @@ import { state } from './core/state.js';
 import { onAudioFile, onAudioUrl } from './features/audio.js';
 import { onImportFile, refreshExamTotal } from './features/exams.js';
 import { onCoevalInput, onCoevFilter } from './features/coeval.js';
-import { ivToggle, onInterviewChange } from './features/interviews.js';
+import { onIvInput, onIvType } from './features/interviews.js';
 import { onRepFilter, onRepRubric } from './features/reports.js';
-import { critTotal, onRubricKind } from './features/rubrics.js';
+import { onRubricKind } from './features/rubrics.js';
 import { markNav, saveAnswers } from './features/student.js';
 
 document.addEventListener('input', e => {
   const t = e.target;
   if (t.id === 'cvq' || t.id === 'cvfilter') onCoevFilter();
-  else if (t.dataset.cvf || t.dataset.cvk) onCoevalInput(t);
+  else if (t.dataset.cvf || t.dataset.cvp) onCoevalInput(t);
+  else if (t.dataset.ivf || t.dataset.ivk) onIvInput(t);
   else if (t.id === 'repq') onRepFilter();
-  else if (t.dataset.cf) {
-    state.rb.criteria[+t.dataset.c][t.dataset.cf] = t.value;
-    if (t.dataset.cf === 'max') { const tt = document.getElementById('crittotal'); if (tt) tt.textContent = critTotal(state.rb.criteria); }
-  } else if (t.dataset.lf) state.rb.levels[+t.dataset.l][t.dataset.lf] = t.value;
+  else if (t.dataset.lf) state.rb.levels[+t.dataset.l][t.dataset.lf] = t.value;
   else if (t.dataset.rb) state.rb[t.dataset.rb] = t.value;
   else if (t.dataset.e) state.ed[t.dataset.e] = t.type === 'checkbox' ? t.checked : t.type === 'number' ? Math.max(1, +t.value || 1) : t.value;
   else if (t.dataset.f) {
@@ -38,9 +36,7 @@ document.addEventListener('change', async e => {
   const t = e.target;
   if (t.dataset.correct !== undefined) state.ed.questions[+t.dataset.q].correct = +t.dataset.correct;
   if (t.dataset.qid && state.run?.dirty) saveAnswers(); // al salir de un campo de texto se guarda ya
-  if (t.id === 'ivtype') return ivToggle();
-  if (t.dataset.iv) return onInterviewChange(t);
-  if (t.id === 'ivfilter') return go('interviews', t.value);
+  if (t.id === 'ivtype') return onIvType(t);
   if (t.dataset.rb === 'kind') return onRubricKind();
   if (t.id === 'resfilter') go('results', t.value);
   if (t.id === 'reprubric') return onRepRubric(t);

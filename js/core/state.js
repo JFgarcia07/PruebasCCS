@@ -5,7 +5,7 @@
 export const state = {
   session: null, profile: null, cv: null, cf: null, rep: null, rs: null, ed: null, rb: null, rp: null, rf: null, run: null, stream: null, gen: 0,
   rubTab: 'exam',   // pestaña activa en Rúbricas: exam | report | interview
-  iv: null,         // entrevistas: { rubrics, rid, rows }
+  iv: null, ivf: null,         // entrevistas: { rubrics, rid, rows }
   cache: { exams: [], rubrics: [], reports: [] }
 };
 

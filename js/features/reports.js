@@ -24,13 +24,13 @@ export const loaders = {
     const [attempts, exams, interviews, rubs, evals, overrides] = await Promise.all([
       q(sb.from('attempts').select('exam_id,student_name,email,ended_at,score,max_score,score_edited_at').order('started_at', { ascending: false })),
       q(sb.from('exams').select('id,title')),
-      q(sb.from('interviews').select('rubric_id,subject_name,subject_type,child_name,interviewer,scores,created_at')),
-      q(sb.from('rubrics').select('id,name,kind,criteria,levels').in('kind', ['interview', 'report']).order('name')),
+      q(sb.from('interviews').select('subject_name,subject_type,child_name,interviewer,scores,held_on,created_at')),
+      q(sb.from('rubrics').select('id,name,kind,levels').eq('kind', 'report').order('name')),
       q(sb.from('coevaluations').select('student_key,scores,comment,updated_at')),
       q(sb.from('report_overrides').select('*'))]);
     const reportRubrics = rubs.filter(r => r.kind === 'report');
     let saved = ''; try { saved = localStorage.getItem('rep:rubric') || ''; } catch { }
-    state.rep = { students: buildStudents({ attempts, exams, interviews, rubrics: rubs.filter(r => r.kind === 'interview'), evals, overrides }),
+    state.rep = { students: buildStudents({ attempts, exams, interviews, evals, overrides }),
       rubrics: reportRubrics, rubricId: reportRubrics.some(r => r.id === saved) ? saved : '' };
     return state.rep;
   }
@@ -96,9 +96,9 @@ export const views = {
           ${iv.map(i => `<tr><td><b>${esc(i.rubric)}</b></td><td>${esc(i.who)}${i.interviewer ? ` <span class="mut">· ${esc(i.interviewer)}</span>` : ''}</td><td>${fmtD(i.date)}</td><td>${i.score} / ${i.max}</td></tr>`).join('')}${sub(iv, 3, 0)}</tbody></table></div>` : '<p class="mut">Sin entrevistas registradas.</p>'}
 
         <h3 class="sec-title">Coevaluación docente</h3>
-        ${cv ? `<div class="tablewrap"><table class="rep"><thead><tr><th>Área</th><th></th><th>Suma de niveles</th><th>Puntos</th><th>%</th></tr></thead><tbody>
-          ${cv.parts.map(p => `<tr><td><b>${esc(p.name)}</b></td><td></td><td>${p.raw} / ${p.max}</td><td>${p.points} / ${p.outOf}</td><td>${pctTxt(p.points, p.outOf)}</td></tr>`).join('')}
-          <tr class="subtot"><td colspan="3"><b>Total coevaluación</b></td><td><b>${cv.score} / ${cv.max}</b></td><td>${pctTxt(cv.score, cv.max)}</td></tr></tbody></table></div>
+        ${cv ? `<div class="tablewrap"><table class="rep"><thead><tr><th>Área</th><th></th><th>Porcentaje</th><th>Puntos</th><th></th></tr></thead><tbody>
+          ${cv.parts.map(p => `<tr><td><b>${esc(p.name)}</b></td><td></td><td>${p.pct} %</td><td>${p.points} / ${p.outOf}</td><td></td></tr>`).join('')}
+          <tr class="subtot"><td colspan="3"><b>Total coevaluación</b></td><td><b>${cv.score} / ${cv.max}</b></td><td></td></tr></tbody></table></div>
           ${cv.comment ? `<p style="white-space:pre-wrap"><b>Comentario:</b> ${esc(cv.comment)}</p>` : ''}` : '<p class="mut">Sin coevaluación registrada.</p>'}
       </div>
       <div class="paper-foot">Calvary Christian School · Documento confidencial</div>

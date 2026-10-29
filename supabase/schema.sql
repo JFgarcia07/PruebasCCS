@@ -642,5 +642,22 @@ create policy report_overrides_admin on public.report_overrides for all to authe
   using (public.is_admin()) with check (public.is_admin());
 
 
+-- =====================================================================
+-- ENTREVISTAS CON LAS DOS RÚBRICAS FIJAS + COEVALUACIÓN POR PORCENTAJE
+-- Las rúbricas de entrevista (padres y estudiante, 15 puntos) viven en la app (js/core/interview-rubrics.js),
+-- ya no se crean desde la plataforma. La coevaluación se llena a mano: porcentaje de comportamiento y de académico.
+-- Ejecutar esta sección es seguro aunque ya hayas corrido lo anterior.
+-- =====================================================================
+alter table public.interviews alter column rubric_id drop not null;       -- ya no depende de una rúbrica creada por la administración
+alter table public.interviews add column if not exists held_on date not null default current_date;
+
+-- Evaluaciones hechas con el formato anterior (criterios 1-4): se convierten a porcentaje por área, con el mismo resultado en puntos.
+update public.coevaluations c
+   set scores = jsonb_build_object(
+         'A', coalesce((select round(sum(e.value::numeric) / 24 * 100, 2) from jsonb_each_text(c.scores) e where e.key like 'A.%'), 0),
+         'B', coalesce((select round(sum(e.value::numeric) / 24 * 100, 2) from jsonb_each_text(c.scores) e where e.key like 'B.%'), 0))
+ where c.scores->'A' is null or c.scores->'B' is null;
+
+
 -- Refresca la cache de la API (PostgREST) para que vea las funciones nuevas o cambiadas al terminar.
 notify pgrst, 'reload schema';

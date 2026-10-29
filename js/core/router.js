@@ -14,8 +14,8 @@ export async function go(view, p) {
   const my = ++state.gen;
   try {
     if (!sb && view !== 'home') view = 'setup';
-    if (['teacher', 'results', 'editor', 'rubrics', 'rubedit', 'reports', 'repstudent', 'interviews', 'coevals', 'coevfill'].includes(view) && !state.session) view = 'auth';
-    if (['interviews', 'coevals', 'coevfill', 'reports', 'repstudent'].includes(view) && !isAdmin()) view = 'teacher'; // reportes, entrevistas y coevaluación: administración
+    if (['teacher', 'results', 'editor', 'rubrics', 'rubedit', 'reports', 'repstudent', 'interviews', 'ivform', 'coevals', 'coevfill'].includes(view) && !state.session) view = 'auth';
+    if (['interviews', 'ivform', 'coevals', 'coevfill', 'reports', 'repstudent'].includes(view) && !isAdmin()) view = 'teacher'; // reportes, entrevistas y coevaluación: administración
     let data = p;
     if (registry.loaders[view]) { app.innerHTML = '<div class="loading">Cargando…</div>'; data = await registry.loaders[view](p); }
     if (my !== state.gen) return;
