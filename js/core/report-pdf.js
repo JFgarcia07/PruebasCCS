@@ -1,8 +1,10 @@
 /* PDF formal del reporte de un estudiante (jsPDF, cargado solo al descargar). */
 import { INTERVIEW_MODES } from './report-calc.js';
+import { download } from './ui.js';
 import { fdate } from './util.js';
 
 const JSPDF = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+const JSZIP = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
 const loadScript = src => new Promise((res, rej) => {
   if (loadScript[src]) return res();
   const s = document.createElement('script'); s.src = src;
@@ -25,27 +27,31 @@ const imgPng = (src, px = 360) => new Promise(res => {
 const NAVY = [27, 38, 68], GOLD = [201, 168, 119], GRAY = [102, 112, 137], INK = [22, 33, 63], SOFT = [238, 241, 248], LINE = [214, 219, 232];
 const CLS = { ok: [21, 128, 61], warn: [180, 83, 9], bad: [185, 28, 28] };
 
-/* Documento nuevo con el logo ya cargado (se carga una sola vez aunque se dibujen muchos informes) */
-async function newDoc() {
-  await loadScript(JSPDF);
-  const doc = new window.jspdf.jsPDF({ unit: 'pt', format: 'letter' });
-  return { doc, logo: await imgPng('logo-white.webp', 240) };
-}
+/* El logo se carga una sola vez aunque se generen muchos informes */
+async function loadAssets() { await loadScript(JSPDF); return { logo: await imgPng('logo-white.webp', 240) }; }
+const blankDoc = () => new window.jspdf.jsPDF({ unit: 'pt', format: 'letter' });
 const slugOf = name => name.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase();
 
 /* s: estudiante (report-calc) · sum: summarize() · rubricName: rúbrica de reporte usada (o '') */
 export async function reportPDF(s, sum, rubricName) {
-  const ctx = await newDoc();
-  drawReport(ctx, s, sum, rubricName);
-  ctx.doc.save(`informe-${slugOf(s.name) || 'estudiante'}.pdf`);
+  const { logo } = await loadAssets(), doc = blankDoc();
+  drawReport({ doc, logo }, s, sum, rubricName);
+  doc.save(`informe-${slugOf(s.name) || 'estudiante'}.pdf`);
 }
 
-/* Todos los informes en un solo PDF: cada estudiante empieza en hoja nueva y numera sus propias páginas.
-   items: [{ s, sum }] en el orden en que deben salir */
-export async function allReportsPDF(items, rubricName) {
-  const ctx = await newDoc();
-  items.forEach(({ s, sum }, i) => { if (i) ctx.doc.addPage(); drawReport(ctx, s, sum, rubricName); });
-  ctx.doc.save('informes-estudiantes.pdf');
+/* Todos los informes en un .zip, un PDF por estudiante. items: [{ s, sum }] */
+export async function allReportsZip(items, rubricName) {
+  const { logo } = await loadAssets();
+  await loadScript(JSZIP);
+  const zip = new window.JSZip(), used = new Set();
+  for (const [i, { s, sum }] of items.entries()) {
+    const doc = blankDoc(); drawReport({ doc, logo }, s, sum, rubricName);
+    let name = `informe-${slugOf(s.name) || 'estudiante'}`, n = 2; const base = name;
+    while (used.has(name)) name = `${base}-${n++}`;   // dos estudiantes con el mismo nombre no se pisan
+    used.add(name); zip.file(name + '.pdf', doc.output('arraybuffer'));
+    if (i % 5 === 4) await new Promise(r => setTimeout(r));   // deja respirar a la página mientras se generan
+  }
+  download('informes-estudiantes.zip', await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' }), 'application/zip');
 }
 
 /* Dibuja el informe de un estudiante a partir de la página actual del documento */

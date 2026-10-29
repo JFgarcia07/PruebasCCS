@@ -4,7 +4,7 @@ import { q, rpc } from '../core/api.js';
 import { sb } from '../core/config.js';
 import { buildStudents, INTERVIEW_MODES, INTERVIEW_TYPES, summarize } from '../core/report-calc.js';
 import { INTERVIEW_RUBRICS } from '../core/interview-rubrics.js';
-import { allReportsPDF, reportPDF } from '../core/report-pdf.js';
+import { allReportsZip, reportPDF } from '../core/report-pdf.js';
 import { go, render } from '../core/router.js';
 import { state } from '../core/state.js';
 import { ask, toast } from '../core/ui.js';
@@ -64,7 +64,7 @@ export const views = {
       <div class="stat"><b>${students.filter(s => s.override?.manual_total != null).length}</b><span>Notas ajustadas</span></div>
       <div class="stat"><b>${avg === null ? '—' : avg + ' %'}</b><span>Promedio general</span></div></div>
     <div class="row" style="margin-bottom:.8rem"><input id="repq" class="grow" placeholder="Buscar por nombre o correo…" autocomplete="off">
-      <button data-act="repall" ${students.length ? '' : 'disabled'}>⬇ Descargar todos (PDF)</button></div>
+      <button data-act="repall" ${students.length ? '' : 'disabled'}>⬇ Descargar todos (ZIP)</button></div>
     <div class="card tablewrap">${students.length ? `<table><thead><tr><th>Estudiante</th><th>Exámenes</th><th>Entrevistas</th><th>Coevaluación</th><th>Total</th><th>%</th><th>Nivel</th><th></th></tr></thead>
       <tbody id="reprows">${students.map(rowHTML).join('')}</tbody></table>`
       : '<div class="empty"><div class="ic">📭</div>Aún no hay estudiantes que hayan presentado un examen.</div>'}</div>`;
@@ -133,12 +133,12 @@ export const acts = {
   reports: () => go('reports'),
   repback: () => { render('reports'); window.scrollTo(0, 0); },
   repstudent: el => { state.rs = el.dataset.key; render('repstudent'); window.scrollTo(0, 0); },
-  /* Un solo PDF con el informe de cada estudiante que ya tiene notas */
+  /* Un .zip con un PDF por cada estudiante que ya tiene notas */
   repall: async () => {
     const items = state.rep.students.map(s => ({ s, sum: summarize(s, levels()) })).filter(x => !x.sum.empty);
     if (!items.length) return toast('Todavía no hay reportes con notas para descargar.', 'err');
     toast(`Generando ${items.length} ${items.length === 1 ? 'informe' : 'informes'}…`);
-    await allReportsPDF(items, rubricName());
+    await allReportsZip(items, rubricName());
   },
   reppdf: async el => { const s = student(el.dataset.key); await reportPDF(s, summarize(s, levels()), rubricName()); },
   repadjust: el => {
