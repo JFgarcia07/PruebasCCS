@@ -51,7 +51,7 @@ Módulos ES nativos: no hay paso de compilación; Live Server, Netlify o Cloudfl
 - **Administración**: además ve todos los exámenes y resultados (con el profesor de cada uno), crea rúbricas de todos los tipos (examen, reporte y entrevista), llena las entrevistas y puede modificar notas a mano (se conserva la nota automática y queda marcada como *editada*).
 - Para nombrar a la administración, una sola vez en el SQL Editor de Supabase (nadie puede cambiar su rol desde la app):
   `update public.profiles set role = 'admin' where email = 'correo@colegio.edu';`
-- **Estudiante**: para entrar al examen escribe código, nombre y correo. Hay un intento por correo y examen.
+- **Estudiante**: para entrar al examen escribe código, nombre, correo y grado. Hay un intento por correo y examen.
 - Entrevistas: siempre llevan entrevistado y entrevistador. Alumno: nombre, grado, edad y encargado. Padre/madre: nombre, hijo/a, edad y correo.
 
 ## Coevaluación docente (solo administración)

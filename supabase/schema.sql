@@ -134,7 +134,8 @@ end $$;
 
 -- La firma cambió (ahora pide el correo): se elimina la anterior para que nadie la use.
 drop function if exists public.student_start(text, text, uuid);
-create or replace function public.student_start(p_code text, p_name text, p_email text, p_token uuid default null)
+drop function if exists public.student_start(text, text, text, uuid);
+create or replace function public.student_start(p_code text, p_name text, p_email text, p_grade text, p_token uuid default null)
 returns jsonb language plpgsql security definer set search_path = public, extensions as $$
 declare e public.exams; a public.attempts; ord jsonb; r record; ek text;
 begin
@@ -143,6 +144,7 @@ begin
   if btrim(coalesce(p_name, '')) = '' then raise exception 'Escribe tu nombre'; end if;
   ek := lower(btrim(coalesce(p_email, '')));
   if length(ek) > 200 or ek !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' then raise exception 'Escribe un correo electrónico válido'; end if;
+  if btrim(coalesce(p_grade, '')) = '' then raise exception 'Escribe tu grado'; end if;
 
   -- Un intento por correo y examen (la identidad del estudiante es su correo).
   select * into a from public.attempts where exam_id = e.id and email_key = ek;
@@ -161,8 +163,8 @@ begin
   else
     select jsonb_agg(q->>'id' order by case when e.shuffle then random() else n end)
       into ord from jsonb_array_elements(e.questions) with ordinality t(q, n);
-    insert into public.attempts (exam_id, student_name, name_key, email, email_key, q_order)
-      values (e.id, left(btrim(p_name), 150), public._norm(p_name), left(btrim(p_email), 200), ek, coalesce(ord, '[]')) returning * into a;
+    insert into public.attempts (exam_id, student_name, name_key, email, email_key, grade, q_order)
+      values (e.id, left(btrim(p_name), 150), public._norm(p_name), left(btrim(p_email), 200), ek, left(btrim(p_grade), 100), coalesce(ord, '[]')) returning * into a;
   end if;
 
   return jsonb_build_object(
@@ -228,10 +230,10 @@ end $$;
 
 -- ---------- Permisos ----------
 revoke all on function public._norm(text), public._grade(jsonb, jsonb), public._attempt(uuid, uuid) from public, anon, authenticated;
-revoke all on function public.student_exam_info(text), public.student_start(text, text, text, uuid),
+revoke all on function public.student_exam_info(text), public.student_start(text, text, text, text, uuid),
   public.student_save(uuid, uuid, jsonb), public.student_flag(uuid, uuid, text),
   public.student_shot(uuid, uuid, text), public.student_submit(uuid, uuid, jsonb) from public;
-grant execute on function public.student_exam_info(text), public.student_start(text, text, text, uuid),
+grant execute on function public.student_exam_info(text), public.student_start(text, text, text, text, uuid),
   public.student_save(uuid, uuid, jsonb), public.student_flag(uuid, uuid, text),
   public.student_shot(uuid, uuid, text), public.student_submit(uuid, uuid, jsonb) to anon, authenticated;
 
@@ -549,6 +551,7 @@ create policy rubrics_delete on public.rubrics for delete to authenticated
 -- Estudiante: correo del intento (un intento por correo y examen). Los intentos antiguos quedan sin correo.
 alter table public.attempts add column if not exists email text;
 alter table public.attempts add column if not exists email_key text;
+alter table public.attempts add column if not exists grade text;   -- grado que escribe el estudiante al entrar al examen
 alter table public.attempts drop constraint if exists attempts_exam_id_name_key_key;
 create unique index if not exists attempts_exam_email_uq on public.attempts(exam_id, email_key) where email_key is not null;
 

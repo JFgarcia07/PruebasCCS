@@ -14,6 +14,8 @@ export const views = {
       <label>Código del examen</label><input id="jcode" autocomplete="off" value="${esc(p?.code || '')}" style="text-transform:uppercase">
       <label>Tu nombre completo</label><input id="jname" autocomplete="name">
       <label>Tu correo electrónico</label><input id="jemail" type="email" autocomplete="email" inputmode="email">
+      <label>Tu grado (y sección)</label><input id="jgrade" list="grades" autocomplete="off" placeholder="Ej. 5.º primaria B">
+      <datalist id="grades">${['Preprimaria', '1.º primaria', '2.º primaria', '3.º primaria', '4.º primaria', '5.º primaria', '6.º primaria', '1.º básico', '2.º básico', '3.º básico', '4.º diversificado', '5.º diversificado', '6.º diversificado'].map(g => `<option value="${g}">`).join('')}</datalist>
       <div id="camwrap" hidden><p class="mut camhint">📷 Este examen requiere cámara. Verifica que te veas bien.</p>
         <video id="cam" autoplay muted playsinline></video></div>
       <p id="jmsg" class="mut"></p>
@@ -59,10 +61,11 @@ export const tokKey = (code, email) => `att:${code}:${norm(email)}`;
 export const setMsg = (t, bad) => { const m = $('#jmsg'); m.textContent = t; m.className = bad ? 'wrong' : 'mut'; };
 
 export async function startFlow() {
-  const code = $('#jcode').value.trim().toUpperCase(), name = $('#jname').value.trim(), email = $('#jemail').value.trim();
+  const code = $('#jcode').value.trim().toUpperCase(), name = $('#jname').value.trim(), email = $('#jemail').value.trim(), grade = $('#jgrade').value.trim();
   if (!code) return setMsg('Escribe el código del examen.', true);
   if (!name) return setMsg('Escribe tu nombre.', true);
   if (!/^\S+@\S+\.\S+$/.test(email)) return setMsg('Escribe un correo electrónico válido.', true);
+  if (!grade) return setMsg('Escribe tu grado.', true);
   setMsg('');
   let info;
   try { info = await rpc('student_exam_info', { p_code: code }); } catch (e) { return setMsg(e.message, true); }
@@ -81,7 +84,7 @@ export async function startFlow() {
   let r;
   setMsg('Entrando al examen…');
   await wait(Math.random() * 2500); // reparte la entrada cuando toda la clase pulsa a la vez
-  try { r = await rpc('student_start', { p_code: code, p_name: name, p_email: email, p_token: saved.token || null }); }
+  try { r = await rpc('student_start', { p_code: code, p_name: name, p_email: email, p_grade: grade, p_token: saved.token || null }); }
   catch (e) { return setMsg(e.message, true); }
   if (r.expired) { stopStream(); return setMsg('Tu tiempo para este examen ya terminó.', true); }
   try { localStorage.setItem(tokKey(code, email), JSON.stringify({ token: r.token })); } catch { }

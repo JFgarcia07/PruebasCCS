@@ -50,7 +50,7 @@ export async function reportPDF(s, sum, rubricName) {
   // Datos del estudiante
   font('bold', 8.5, GRAY); text('ESTUDIANTE', M, y); y += 20;
   font('bold', 19, NAVY); text(s.name, M, y); y += 17;
-  if (s.email) { font('normal', 10, GRAY); text(s.email, M, y); y += 14; }
+  if (s.email || s.grade) { font('normal', 10, GRAY); text([s.email, s.grade].filter(Boolean).join('  ·  '), M, y); y += 14; }
   y += 8;
 
   // Resumen: total acumulado y rango de la rúbrica de reporte

@@ -16,10 +16,11 @@ export function buildStudents(raw) {
   for (const a of raw.attempts) {   // vienen del más reciente al más antiguo: el nombre que se conserva es el último escrito
     const k = studentKey(a); let s = students.get(k);
     if (!s) {
-      s = { key: k, name: a.student_name, email: a.email || '', exams: [], interviews: [], coeval: null, override: null };
+      s = { key: k, name: a.student_name, email: a.email || '', grade: a.grade || '', exams: [], interviews: [], coeval: null, override: null };
       students.set(k, s);
       const nk = norm(a.student_name); if (!byName.has(nk)) byName.set(nk, []); byName.get(nk).push(s);
     }
+    if (!s.grade && a.grade) s.grade = a.grade;
     if (a.ended_at && a.max_score) s.exams.push({ title: title[a.exam_id] || 'Examen', date: a.ended_at, score: +a.score, max: +a.max_score, edited: !!a.score_edited_at });
   }
   // Entrevistas: al alumno entrevistado por su nombre; al padre/madre, por el nombre de su hijo/a

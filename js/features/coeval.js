@@ -16,13 +16,14 @@ const studentKey = a => a.email ? a.email.trim().toLowerCase() : 'n:' + norm(a.s
 export const loaders = {
   async coevals() {
     const [att, exams, list] = await Promise.all([
-      q(sb.from('attempts').select('exam_id,student_name,email').order('started_at', { ascending: false })),
+      q(sb.from('attempts').select('exam_id,student_name,email,grade').order('started_at', { ascending: false })),
       q(sb.from('exams').select('id,title')),
       q(sb.from('coevaluations').select('id,student_key,scores,comment,evaluator,updated_at'))]);
     const title = Object.fromEntries(exams.map(e => [e.id, e.title])), students = new Map();
     for (const a of att) {
       const k = studentKey(a); let s = students.get(k);
-      if (!s) students.set(k, s = { key: k, name: a.student_name, email: a.email || '', exams: new Set() });
+      if (!s) students.set(k, s = { key: k, name: a.student_name, email: a.email || '', grade: a.grade || '', exams: new Set() });
+      if (!s.grade && a.grade) s.grade = a.grade;
       s.exams.add(title[a.exam_id] || 'Examen');
     }
     state.cv = { students: [...students.values()].sort((x, y) => x.name.localeCompare(y.name, 'es')), evals: new Map(list.map(e => [e.student_key, e])) };
@@ -33,7 +34,7 @@ export const loaders = {
 const rowHTML = (s, e) => {
   const sc = e ? cvScore(R, e.scores) : null, ex = [...s.exams];
   return `<tr data-find="${esc(norm(s.name + ' ' + s.email))}" data-done="${e ? 1 : 0}">
-    <td><b>${esc(s.name)}</b>${s.email ? `<br><span class="mut">${esc(s.email)}</span>` : ''}</td>
+    <td><b>${esc(s.name)}</b>${s.email ? `<br><span class="mut">${esc(s.email)}</span>` : ''}${s.grade ? `<br><span class="tag">${esc(s.grade)}</span>` : ''}</td>
     <td class="mut" title="${esc(ex.join(' · '))}">${esc(ex.slice(0, 2).join(' · '))}${ex.length > 2 ? ` +${ex.length - 2}` : ''}</td>
     ${sc ? `${sc.parts.map(p => `<td>${p.points}</td>`).join('')}<td><b>${sc.total}</b></td><td class="mut">${fdate(e.updated_at)}</td>`
       : `<td colspan="${R.sections.length + 1}"><span class="tag warn">Pendiente</span></td><td></td>`}
@@ -63,7 +64,7 @@ export const views = {
     return `
     <div class="row" style="margin-bottom:1rem"><h2 class="grow" style="margin:0">Coevaluación · ${esc(f.name)}</h2>
       <button class="ghost" data-act="coevals">Cancelar</button><button data-act="coevsave">Guardar</button></div>
-    <div class="card"><div class="tags" style="margin:0"><span class="tag">👤 ${esc(f.name)}</span>${f.email ? `<span class="tag">${esc(f.email)}</span>` : ''}
+    <div class="card"><div class="tags" style="margin:0"><span class="tag">👤 ${esc(f.name)}</span>${f.email ? `<span class="tag">${esc(f.email)}</span>` : ''}${f.grade ? `<span class="tag">${esc(f.grade)}</span>` : ''}
       ${f.exams.map(t => `<span class="tag">📝 ${esc(t)}</span>`).join('')}</div>
       <p class="mut" style="margin:.6rem 0 0">Marca, en cada criterio, la descripción que mejor representa al estudiante.</p></div>
     ${R.sections.map(s => `<h3 style="margin-top:1.2rem;color:var(--pri)">${s.id}. ${esc(s.name)} (${s.points} puntos)</h3>
@@ -100,7 +101,7 @@ export const acts = {
   coevals: () => go('coevals'),
   coevfill: el => {
     const s = state.cv.students.find(x => x.key === el.dataset.key), e = state.cv.evals.get(s.key);
-    state.cf = { key: s.key, name: s.name, email: s.email, exams: [...s.exams], id: e?.id || null, scores: { ...(e?.scores || {}) }, comment: e?.comment || '' };
+    state.cf = { key: s.key, name: s.name, email: s.email, grade: s.grade, exams: [...s.exams], id: e?.id || null, scores: { ...(e?.scores || {}) }, comment: e?.comment || '' };
     go('coevfill');
   },
   coevsave: async () => {
