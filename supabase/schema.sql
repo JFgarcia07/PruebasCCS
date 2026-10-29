@@ -640,3 +640,7 @@ alter table public.report_overrides enable row level security;
 drop policy if exists report_overrides_admin on public.report_overrides;
 create policy report_overrides_admin on public.report_overrides for all to authenticated
   using (public.is_admin()) with check (public.is_admin());
+
+
+-- Refresca la cache de la API (PostgREST) para que vea las funciones nuevas o cambiadas al terminar.
+notify pgrst, 'reload schema';
