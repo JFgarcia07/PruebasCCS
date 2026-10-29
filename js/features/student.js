@@ -108,7 +108,7 @@ export function runExam(r) {
       rpc('student_shot', { p_attempt: at.id, p_token: at.token, p_img: c.toDataURL('image/jpeg', .5) }).catch(() => { });
     };
     setTimeout(shoot, 1500 + Math.random() * 8000);
-    state.run.timers.push(setInterval(shoot, 60000));
+    state.run.timers.push(setInterval(shoot, 600000));
     state.stream.getVideoTracks()[0].addEventListener('ended', () => flag('La cámara se desconectó o se apagó'));
   } else stopStream();
   const on = (t, ev, fn) => { t.addEventListener(ev, fn); state.run.handlers.push([t, ev, fn]); };

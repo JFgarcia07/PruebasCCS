@@ -15,7 +15,7 @@ Frontend estático (HTML/CSS/JS) + Supabase (Auth, Postgres con RLS, funciones R
 - Estudiantes: sin cuenta ni acceso a tablas; solo llaman RPC (`student_*`) que nunca devuelven las respuestas correctas.
   La nota se calcula en el servidor al enviar. Cada intento tiene un token secreto para reanudar tras recargar.
 - Un intento por nombre normalizado y examen. El tiempo se valida en el servidor (30 s de gracia).
-- Cámara: foto cada 30 s (máx. 60) y alertas por cambio de pestaña, pérdida de foco, copiar/pegar o cámara cortada.
+- Cámara: foto cada 10 min (máx. 30) y alertas por cambio de pestaña, pérdida de foco, copiar/pegar o cámara cortada.
   Es disuasorio, no infalible.
 # PruebasCCS
 
