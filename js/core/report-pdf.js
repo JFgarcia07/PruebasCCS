@@ -1,4 +1,5 @@
 /* PDF formal del reporte de un estudiante (jsPDF, cargado solo al descargar). */
+import { INTERVIEW_MODES } from './report-calc.js';
 import { fdate } from './util.js';
 
 const JSPDF = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
@@ -106,13 +107,12 @@ export async function reportPDF(s, sum, rubricName) {
     ex.map(e => [e.title + (e.edited ? '  (nota editada)' : ''), fdate(e.date).split(',')[0], `${e.score} / ${e.max}`, pc(e.score, e.max)]), 'Sin exámenes registrados.');
   if (ex.length) { y -= 8; sumRow('Subtotal exámenes', Math.round(ex.reduce((a, e) => a + e.score, 0) * 100) / 100, Math.round(ex.reduce((a, e) => a + e.max, 0) * 100) / 100); }
 
-  const iv = s.interviews;
-  section('Entrevistas', iv.length && !(s.override?.interview_mode) ? iv.length + (iv.length === 1 ? ' entrevista' : ' entrevistas') : '', s.override?.interview_mode ? 3 : iv.length + 2);
-  const ivx = sum.parts.interviews;
-  if (ivx.mode) { font('italic', 10, GRAY); text('Entrevistas excluidas por la administración: ' + (ivx.mode === 'full' ? 'puntaje completo.' : 'calificadas en cero.'), M, y + 4); y += 34; sumRow('Entrevistas', ivx.score, ivx.max); }
-  else table([{ t: 'RÚBRICA', w: 150 }, { t: 'ENTREVISTADO', w: 80 }, { t: 'ENTREVISTADOR', w: 110 }, { t: 'FECHA', w: 70 }, { t: 'PUNTOS', w: CW - 410, r: 1 }],
-    iv.map(i => [i.rubric, i.who, i.interviewer || '—', fdate(i.date).split(',')[0], `${i.score} / ${i.max}`]), 'Sin entrevistas registradas.');
-  if (iv.length && !ivx.mode) { y -= 8; sumRow('Subtotal entrevistas', Math.round(iv.reduce((a, e) => a + e.score, 0) * 100) / 100, Math.round(iv.reduce((a, e) => a + e.max, 0) * 100) / 100); }
+  const iv = sum.parts.interviews;
+  section('Entrevistas', iv.n ? iv.n + (iv.n === 1 ? ' entrevista' : ' entrevistas') : '', iv.rows.length + 2);
+  table([{ t: 'RÚBRICA', w: 150 }, { t: 'ENTREVISTADO', w: 80 }, { t: 'ENTREVISTADOR', w: 110 }, { t: 'FECHA', w: 70 }, { t: 'PUNTOS', w: CW - 410, r: 1 }],
+    iv.rows.map(i => i.mode ? [i.rubric, 'Excluida: ' + INTERVIEW_MODES[i.mode], '', '', i.mode === 'skip' ? '—' : `${i.score} / ${i.max}`]
+      : [i.rubric, i.who, i.interviewer || '—', fdate(i.date).split(',')[0], `${i.score} / ${i.max}`]), 'Sin entrevistas registradas.');
+  if (iv.rows.length) { y -= 8; sumRow('Subtotal entrevistas', iv.score, iv.max); }
 
   const cv = s.coeval;
   section('Coevaluación docente', cv ? 'Actualizada ' + fdate(cv.date).split(',')[0] : '', 5);

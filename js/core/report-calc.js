@@ -5,8 +5,9 @@ import { INTERVIEW_RUBRICS, interviewScore } from './interview-rubrics.js';
 import { levelFor } from './levels.js';
 import { norm } from './util.js';
 
-/* Lo que valen las entrevistas en el reporte: una a padres y una al estudiante (15 + 15) */
-export const INTERVIEWS_MAX = INTERVIEW_RUBRICS.padre.total + INTERVIEW_RUBRICS.alumno.total;
+/* Las dos entrevistas del reporte (15 puntos cada una) y lo que se puede hacer con cada una si se excluye */
+export const INTERVIEW_TYPES = ['padre', 'alumno'];
+export const INTERVIEW_MODES = { zero: 'en cero', full: 'con puntaje completo', skip: 'no se toma en cuenta' };
 const r2 = n => Math.round(n * 100) / 100;
 /* Un estudiante es su correo (o su nombre, en los intentos antiguos que no lo tienen), sin importar cuántos exámenes haya hecho */
 export const studentKey = a => a.email ? a.email.trim().toLowerCase() : 'n:' + norm(a.student_name);
@@ -29,7 +30,7 @@ export function buildStudents(raw) {
     const r = INTERVIEW_RUBRICS[i.subject_type]; if (!r) continue;
     const sc = interviewScore(i.subject_type, i.scores);
     if (!sc.done) continue;   // entrevista todavía sin notas
-    const item = { rubric: r.name, who: i.subject_type === 'padre' ? 'Padre / madre' : 'Alumno', interviewer: i.interviewer || '', date: i.held_on || i.created_at, score: sc.score, max: sc.max };
+    const item = { type: i.subject_type, rubric: r.name, who: i.subject_type === 'padre' ? 'Padre / madre' : 'Alumno', interviewer: i.interviewer || '', date: i.held_on || i.created_at, score: sc.score, max: sc.max };
     for (const s of byName.get(norm(i.subject_type === 'padre' ? i.child_name : i.subject_name)) || []) s.interviews.push(item);
   }
   for (const e of raw.evals) {
@@ -43,13 +44,25 @@ export function buildStudents(raw) {
 
 /* Total de un estudiante: suma de todo lo que tiene; la nota ajustada a mano reemplaza a la suma automática.
    `levels` = rangos de la rúbrica de reporte elegida (null = escala predeterminada). */
+/* Entrevistas del reporte. Cada tipo (a padres / al estudiante) puede usarse tal cual o excluirse: en cero, con puntaje completo,
+   o sin tomarla en cuenta (no suma ni al puntaje ni al máximo). Una excluida «en cero» o «completa» sí cuenta sus 15 puntos de máximo. */
+function interviewPart(s) {
+  const modes = s.override?.interview_modes || {}, rows = [];
+  for (const t of INTERVIEW_TYPES) {
+    const r = INTERVIEW_RUBRICS[t], mode = modes[t];
+    if (mode) rows.push({ type: t, rubric: r.name, mode, score: mode === 'full' ? r.total : 0, max: mode === 'skip' ? 0 : r.total });
+    else rows.push(...s.interviews.filter(x => x.type === t));
+  }
+  return { n: rows.filter(x => !x.mode).length, rows, modes, excluded: rows.some(x => x.mode), score: r2(rows.reduce((a, x) => a + x.score, 0)), max: r2(rows.reduce((a, x) => a + x.max, 0)) };
+}
+
+/* Total de un estudiante: suma de todo lo que tiene; la nota ajustada a mano reemplaza a la suma automática.
+   `levels` = rangos de la rúbrica de reporte elegida (null = escala predeterminada). */
 export function summarize(s, levels) {
   const part = list => ({ n: list.length, score: r2(list.reduce((a, x) => a + x.score, 0)), max: r2(list.reduce((a, x) => a + x.max, 0)) });
-  const parts = { exams: part(s.exams), interviews: part(s.interviews), coeval: part(s.coeval ? [s.coeval] : []) };
-  // La administración puede excluir las entrevistas reales: todas en cero o todas en puntaje completo
-  const mode = s.override?.interview_mode || null;
-  if (mode) parts.interviews = { n: 0, mode, score: mode === 'full' ? INTERVIEWS_MAX : 0, max: INTERVIEWS_MAX };
-  const items = [...s.exams, ...(mode ? [parts.interviews] : s.interviews), ...(s.coeval ? [s.coeval] : [])];
+  const iv = interviewPart(s);
+  const parts = { exams: part(s.exams), interviews: iv, coeval: part(s.coeval ? [s.coeval] : []) };
+  const items = [...s.exams, ...iv.rows.filter(x => x.mode !== 'skip'), ...(s.coeval ? [s.coeval] : [])];
   const auto = r2(items.reduce((a, x) => a + x.score, 0)), max = r2(items.reduce((a, x) => a + x.max, 0));
   const adjusted = s.override?.manual_total != null, total = adjusted ? +s.override.manual_total : auto;
   const pct = max ? Math.round(total / max * 100) : 0;

@@ -674,5 +674,50 @@ alter table public.report_overrides drop constraint if exists report_overrides_i
 alter table public.report_overrides add constraint report_overrides_interview_mode_check check (interview_mode in ('zero', 'full'));   -- 'zero' = todas en cero · 'full' = puntaje completo
 
 
+-- =====================================================================
+-- REPORTES: EXCLUIR CADA ENTREVISTA POR SEPARADO · CAMBIAR EL CORREO DE UN ESTUDIANTE
+-- Ejecutar esta sección es seguro aunque ya hayas corrido lo anterior.
+-- =====================================================================
+-- Modo de cada entrevista: { "padre": "zero"|"full"|"skip", "alumno": "zero"|"full"|"skip" }
+--   zero = en cero · full = con puntaje completo · skip = no se toma en cuenta en el reporte
+alter table public.report_overrides add column if not exists interview_modes jsonb not null default '{}';
+-- Lo que se había guardado con el modo único pasa a las dos entrevistas.
+update public.report_overrides
+   set interview_modes = jsonb_build_object('padre', interview_mode, 'alumno', interview_mode), interview_mode = null
+ where interview_mode is not null;
+
+-- El correo identifica al estudiante (sus intentos, su coevaluación y su ajuste de nota). Solo la administración lo cambia.
+create or replace function public.admin_change_student_email(p_key text, p_email text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare ne text := lower(btrim(coalesce(p_email, ''))); nk text; n int;
+begin
+  if not public.is_admin() then raise exception 'Solo la administración puede cambiar el correo'; end if;
+  if length(ne) > 200 or ne !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' then raise exception 'Escribe un correo electrónico válido'; end if;
+  if ne = p_key then return jsonb_build_object('attempts', 0); end if;
+  if p_key like 'n:%' then nk := substr(p_key, 3); end if;     -- estudiante antiguo sin correo: se identifica por su nombre
+
+  if exists (select 1 from public.attempts a join public.attempts b on b.exam_id = a.exam_id and b.email_key = ne
+              where a.email_key = p_key or (nk is not null and a.email_key is null and a.name_key = nk)) then
+    raise exception 'Ese correo ya tiene un intento en el mismo examen';
+  end if;
+  if exists (select 1 from public.coevaluations where student_key = ne) and exists (select 1 from public.coevaluations where student_key = p_key) then
+    raise exception 'Ese correo ya tiene una coevaluación';
+  end if;
+  if exists (select 1 from public.report_overrides where student_key = ne) and exists (select 1 from public.report_overrides where student_key = p_key) then
+    raise exception 'Ese correo ya tiene un ajuste en Reportes';
+  end if;
+
+  update public.attempts set email = btrim(p_email), email_key = ne
+   where email_key = p_key or (nk is not null and email_key is null and name_key = nk);
+  get diagnostics n = row_count;
+  if n = 0 then raise exception 'No se encontró ese estudiante'; end if;
+  update public.coevaluations set student_key = ne, student_email = btrim(p_email) where student_key = p_key;
+  update public.report_overrides set student_key = ne where student_key = p_key;
+  return jsonb_build_object('attempts', n);
+end $$;
+revoke all on function public.admin_change_student_email(text, text) from public, anon;
+grant execute on function public.admin_change_student_email(text, text) to authenticated;
+
+
 -- Refresca la cache de la API (PostgREST) para que vea las funciones nuevas o cambiadas al terminar.
 notify pgrst, 'reload schema';
