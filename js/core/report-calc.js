@@ -5,6 +5,8 @@ import { INTERVIEW_RUBRICS, interviewScore } from './interview-rubrics.js';
 import { levelFor } from './levels.js';
 import { norm } from './util.js';
 
+/* Lo que valen las entrevistas en el reporte: una a padres y una al estudiante (15 + 15) */
+export const INTERVIEWS_MAX = INTERVIEW_RUBRICS.padre.total + INTERVIEW_RUBRICS.alumno.total;
 const r2 = n => Math.round(n * 100) / 100;
 /* Un estudiante es su correo (o su nombre, en los intentos antiguos que no lo tienen), sin importar cuántos exámenes haya hecho */
 export const studentKey = a => a.email ? a.email.trim().toLowerCase() : 'n:' + norm(a.student_name);
@@ -44,9 +46,12 @@ export function buildStudents(raw) {
 export function summarize(s, levels) {
   const part = list => ({ n: list.length, score: r2(list.reduce((a, x) => a + x.score, 0)), max: r2(list.reduce((a, x) => a + x.max, 0)) });
   const parts = { exams: part(s.exams), interviews: part(s.interviews), coeval: part(s.coeval ? [s.coeval] : []) };
-  const items = [...s.exams, ...s.interviews, ...(s.coeval ? [s.coeval] : [])];
+  // La administración puede excluir las entrevistas reales: todas en cero o todas en puntaje completo
+  const mode = s.override?.interview_mode || null;
+  if (mode) parts.interviews = { n: 0, mode, score: mode === 'full' ? INTERVIEWS_MAX : 0, max: INTERVIEWS_MAX };
+  const items = [...s.exams, ...(mode ? [parts.interviews] : s.interviews), ...(s.coeval ? [s.coeval] : [])];
   const auto = r2(items.reduce((a, x) => a + x.score, 0)), max = r2(items.reduce((a, x) => a + x.max, 0));
-  const adjusted = !!s.override, total = adjusted ? +s.override.manual_total : auto;
+  const adjusted = s.override?.manual_total != null, total = adjusted ? +s.override.manual_total : auto;
   const pct = max ? Math.round(total / max * 100) : 0;
   return { parts, auto, max, total, pct, adjusted, level: max ? levelFor(pct, levels) : null, empty: !items.length };
 }

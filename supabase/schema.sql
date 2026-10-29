@@ -659,5 +659,20 @@ update public.coevaluations c
  where c.scores->'A' is null or c.scores->'B' is null;
 
 
+-- =====================================================================
+-- ENTREVISTAS: PADRE, MADRE Y ENCARGADO · REPORTES: EXCLUIR ENTREVISTAS
+-- Ejecutar esta sección es seguro aunque ya hayas corrido lo anterior.
+-- =====================================================================
+alter table public.interviews add column if not exists father text;
+alter table public.interviews add column if not exists mother text;
+-- (la columna guardian ya existía: ahora es el «encargado»)
+
+-- El ajuste de nota y el modo de entrevistas comparten registro: cada uno puede existir sin el otro.
+alter table public.report_overrides alter column manual_total drop not null;
+alter table public.report_overrides add column if not exists interview_mode text;
+alter table public.report_overrides drop constraint if exists report_overrides_interview_mode_check;
+alter table public.report_overrides add constraint report_overrides_interview_mode_check check (interview_mode in ('zero', 'full'));   -- 'zero' = todas en cero · 'full' = puntaje completo
+
+
 -- Refresca la cache de la API (PostgREST) para que vea las funciones nuevas o cambiadas al terminar.
 notify pgrst, 'reload schema';

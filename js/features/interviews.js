@@ -9,18 +9,22 @@ import { ask, toast } from '../core/ui.js';
 import { $, esc } from '../core/util.js';
 
 const TABS = [['alumno', 'Al estudiante'], ['padre', 'A padres de familia']];
+const GRADES = ['7th', '8th', '9th', '10th', '11th'];
+const COLS = 'id,subject_type,subject_name,child_name,grade,age,father,mother,guardian,email,interviewer,held_on,scores,notes,created_at';
 const today = () => new Date().toLocaleDateString('en-CA');   // AAAA-MM-DD en la hora local
 const fmtDay = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('es') : '';
-const blank = type => ({ id: null, type, subject_name: '', child_name: '', grade: '', age: '', guardian: '', email: '', held_on: today(),
+const blank = type => ({ id: null, type, subject_name: '', child_name: '', grade: '', age: '', father: '', mother: '', guardian: '', email: '', held_on: today(),
   interviewer: state.profile?.name || state.profile?.email || '', scores: {}, notes: '' });
+/* Padre, madre y/o encargado que se anotaron (puede haber 1, 2 o 3) */
+const family = r => [r.father && 'Padre: ' + r.father, r.mother && 'Madre: ' + r.mother, r.guardian && 'Encargado: ' + r.guardian].filter(Boolean);
 /* Datos propios de cada tipo de entrevistado, en una línea */
 const details = r => (r.subject_type === 'padre'
   ? [r.child_name && 'Estudiante: ' + r.child_name, r.grade, r.age && r.age + ' años', r.email]
-  : [r.grade, r.age && r.age + ' años', r.guardian && 'Encargado: ' + r.guardian]).filter(Boolean).map(esc).join(' · ');
+  : [r.grade, r.age && r.age + ' años', ...family(r)]).filter(Boolean).map(esc).join(' · ');
 
 export const loaders = {
   async interviews() {
-    const rows = await q(sb.from('interviews').select('id,subject_type,subject_name,child_name,grade,age,guardian,email,interviewer,held_on,scores,notes,created_at').order('created_at', { ascending: false }));
+    const rows = await q(sb.from('interviews').select(COLS).order('created_at', { ascending: false }));
     state.iv = { rows, tab: state.iv?.tab || 'alumno' };
     return state.iv;
   }
@@ -46,19 +50,21 @@ export const views = {
   ivform: () => {
     const f = state.ivf, R = INTERVIEW_RUBRICS[f.type], padre = f.type === 'padre', s = interviewScore(f.type, f.scores);
     const fld = (label, key, extra = '') => `<div><label>${label}</label><input data-ivf="${key}" value="${esc(f[key])}" ${extra}></div>`;
+    const grades = f.grade && !GRADES.includes(f.grade) ? [...GRADES, f.grade] : GRADES;   // un grado antiguo escrito a mano se conserva
     return `
     <div class="row" style="margin-bottom:1rem"><h2 class="grow" style="margin:0">${esc(R.title)}</h2>
       <button class="ghost" data-act="ivback">Cancelar</button><button data-act="ivsave">Guardar</button></div>
     <div class="card"><p class="mut" style="margin:0 0 .4rem">Proceso de admisión · Valor total: ${R.total} puntos</p>
       <div class="grid">
       ${f.id ? '' : `<div><label>Tipo de entrevista</label><select id="ivtype">${TABS.map(([k, n]) => `<option value="${k}" ${k === f.type ? 'selected' : ''}>${n}</option>`).join('')}</select></div>`}
-      ${fld(padre ? 'Nombre del entrevistado (padre / madre)' : 'Nombre del estudiante entrevistado', 'subject_name')}
-      ${padre ? fld('Nombre del estudiante (hijo/a)', 'child_name') : ''}
-      ${fld('Grado al que aplica', 'grade', 'placeholder="Ej. 5.º primaria"')}
+      ${padre ? fld('Nombre del estudiante (hijo/a)', 'child_name') : fld('Nombre del estudiante entrevistado', 'subject_name')}
+      <div><label>Grado al que aplica</label><select data-ivf="grade"><option value="">Selecciona…</option>${grades.map(g => `<option value="${esc(g)}" ${g === f.grade ? 'selected' : ''}>${esc(g)}</option>`).join('')}</select></div>
       ${fld('Edad', 'age', 'type="number" min="1" max="120" inputmode="numeric"')}
-      ${padre ? fld('Correo electrónico', 'email', 'type="email"') : fld('Padre / madre / encargado', 'guardian')}
+      ${padre ? fld('Correo electrónico', 'email', 'type="email"') : ''}
       ${fld('Fecha', 'held_on', 'type="date"')}
-      ${fld('Entrevistador', 'interviewer')}</div></div>
+      ${fld('Entrevistador', 'interviewer')}</div>
+      <h4 style="margin:1rem 0 .2rem">${padre ? 'Entrevistados' : 'Padre, madre o encargado'} <span class="mut" style="font-weight:400">(escribe al menos uno; puedes anotar hasta tres)</span></h4>
+      <div class="grid">${fld('Padre', 'father')}${fld('Madre', 'mother')}${fld('Encargado', 'guardian')}</div></div>
     <p class="mut"><b>Instrucciones:</b> seleccione el nivel que mejor describa las respuestas y evidencias obtenidas durante la entrevista.</p>
     <div class="card tablewrap" style="padding:0"><table class="rub"><thead><tr><th>Criterio</th>${INTERVIEW_LEVELS.map(l => `<th>${l.v} ${l.v === 1 ? 'punto' : 'puntos'}<br>${esc(l.name)}</th>`).join('')}<th>Punteo</th></tr></thead><tbody>
       ${R.criteria.map(c => `<tr><th class="crit">${esc(c.name)}</th>${INTERVIEW_LEVELS.map(l => `<td><label class="rcell"><input type="radio" name="iv-${c.id}" data-ivk="${c.id}" value="${l.v}" ${f.scores[c.id] !== undefined && +f.scores[c.id] === l.v ? 'checked' : ''}><span>${esc(c.desc[l.v])}</span></label></td>`).join('')}
@@ -90,25 +96,27 @@ export const acts = {
   ivnew: () => { state.ivf = blank(state.iv.tab); go('ivform'); },
   ivopen: el => {
     const r = state.iv.rows.find(x => x.id === el.dataset.id);
-    state.ivf = { ...blank(r.subject_type), ...r, child_name: r.child_name || '', grade: r.grade || '', age: r.age ?? '', guardian: r.guardian || '', email: r.email || '', held_on: r.held_on || today(), scores: { ...r.scores }, notes: r.notes || '' };
+    state.ivf = { ...blank(r.subject_type), ...r, type: r.subject_type, child_name: r.child_name || '', grade: r.grade || '', age: r.age ?? '', father: r.father || '', mother: r.mother || '',
+      guardian: r.guardian || '', email: r.email || '', held_on: r.held_on || today(), scores: { ...r.scores }, notes: r.notes || '' };
     go('ivform');
   },
   ivback: () => { render('interviews'); window.scrollTo(0, 0); },
   ivsave: async () => {
-    const f = state.ivf, R = INTERVIEW_RUBRICS[f.type], padre = f.type === 'padre', v = k => String(f[k] ?? '').trim(), age = +v('age');
-    if (!v('subject_name')) return toast(padre ? 'Escribe el nombre del entrevistado.' : 'Escribe el nombre del estudiante.', 'err');
-    if (padre && !v('child_name')) return toast('Escribe el nombre del estudiante (hijo/a).', 'err');
-    if (!v('grade')) return toast('Escribe el grado al que aplica.', 'err');
+    const f = state.ivf, padre = f.type === 'padre', v = k => String(f[k] ?? '').trim(), age = +v('age');
+    if (padre) { if (!v('child_name')) return toast('Escribe el nombre del estudiante (hijo/a).', 'err'); }
+    else if (!v('subject_name')) return toast('Escribe el nombre del estudiante entrevistado.', 'err');
+    if (!v('grade')) return toast('Selecciona el grado al que aplica.', 'err');
     if (!(age >= 1 && age <= 120)) return toast('Escribe una edad válida.', 'err');
-    if (padre ? !/^\S+@\S+\.\S+$/.test(v('email')) : !v('guardian')) return toast(padre ? 'Escribe un correo electrónico válido.' : 'Escribe el padre, madre o encargado.', 'err');
+    if (!v('father') && !v('mother') && !v('guardian')) return toast(padre ? 'Escribe al menos un entrevistado (padre, madre o encargado).' : 'Escribe al menos el padre, la madre o el encargado.', 'err');
+    if (padre && !/^\S+@\S+\.\S+$/.test(v('email'))) return toast('Escribe un correo electrónico válido.', 'err');
     if (!v('interviewer')) return toast('Escribe quién realiza la entrevista (entrevistador).', 'err');
     const s = interviewScore(f.type, f.scores);
     if (s.done < s.n) return toast(`Faltan criterios por calificar (${s.done} de ${s.n}).`, 'err');
-    const data = { subject_type: f.type, subject_name: v('subject_name').slice(0, 150), child_name: padre ? v('child_name').slice(0, 150) : null, grade: v('grade').slice(0, 100),
-      age: Math.round(age), guardian: padre ? null : v('guardian').slice(0, 150), email: padre ? v('email').slice(0, 200) : null, interviewer: v('interviewer').slice(0, 150),
-      held_on: v('held_on') || today(), scores: f.scores, notes: v('notes').slice(0, 2000) };
-    const cols = 'id,subject_type,subject_name,child_name,grade,age,guardian,email,interviewer,held_on,scores,notes,created_at';
-    const row = await q(f.id ? sb.from('interviews').update(data).eq('id', f.id).select(cols).single() : sb.from('interviews').insert(data).select(cols).single());
+    const names = [v('father'), v('mother'), v('guardian')].filter(Boolean);
+    const data = { subject_type: f.type, subject_name: (padre ? names.join(' y ') : v('subject_name')).slice(0, 150), child_name: padre ? v('child_name').slice(0, 150) : null, grade: v('grade').slice(0, 100),
+      age: Math.round(age), father: v('father').slice(0, 150) || null, mother: v('mother').slice(0, 150) || null, guardian: v('guardian').slice(0, 150) || null,
+      email: padre ? v('email').slice(0, 200) : null, interviewer: v('interviewer').slice(0, 150), held_on: v('held_on') || today(), scores: f.scores, notes: v('notes').slice(0, 2000) };
+    const row = await q(f.id ? sb.from('interviews').update(data).eq('id', f.id).select(COLS).single() : sb.from('interviews').insert(data).select(COLS).single());
     state.iv.rows = f.id ? state.iv.rows.map(r => r.id === f.id ? row : r) : [row, ...state.iv.rows];
     state.iv.tab = f.type; toast('Entrevista guardada', 'ok'); render('interviews'); window.scrollTo(0, 0);
   },

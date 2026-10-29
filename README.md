@@ -22,6 +22,7 @@ Frontend estático (HTML/CSS/JS) + Supabase (Auth, Postgres con RLS, funciones R
 ## Reportes de estudiante (automáticos, solo administración)
 - Menú **Reportes**: de cada estudiante se suman **todos sus exámenes, sus entrevistas y su coevaluación**. El total (puntos y %) se interpreta con la **rúbrica de tipo reporte** que elijas arriba (o la escala predeterminada).
 - Las entrevistas se asignan al estudiante por su nombre (alumno entrevistado, o hijo/a de un padre entrevistado). Los exámenes y la coevaluación, por su correo.
+- En el informe de cada estudiante, **Excluir entrevistas** permite no contar las entrevistas reales y ponerlas **todas en cero** o **todas en puntaje completo** (30 puntos).
 - La administración puede **ajustar la nota a mano** (queda marcada como ajustada, con motivo) y **descargar el informe en PDF**.
 
 ## Enviar exámenes a otro profesor
@@ -54,5 +55,5 @@ Módulos ES nativos: no hay paso de compilación; Live Server, Netlify o Cloudfl
 - Entrevistas: siempre llevan entrevistado y entrevistador. Alumno: nombre, grado, edad y encargado. Padre/madre: nombre, hijo/a, edad y correo.
 
 ## Entrevistas y coevaluación (solo administración)
-- **Entrevistas**: proceso de admisión, con las dos rúbricas fijas (5 criterios de 0 a 3 puntos, total 15). La administración abre una entrevista nueva (al estudiante o a padres), llena los datos (entrevistado, estudiante, grado, edad, encargado o correo, fecha, entrevistador), marca el nivel de cada criterio y el total se calcula solo.
+- **Entrevistas**: proceso de admisión, con las dos rúbricas fijas (5 criterios de 0 a 3 puntos, total 15). La administración abre una entrevista nueva (al estudiante o a padres), llena los datos (entrevistado, estudiante, grado, edad, encargado o correo, fecha, entrevistador), marca el nivel de cada criterio y el total se calcula solo. El grado se elige de una lista (7th a 11th) y se pueden anotar padre, madre y encargado (hasta 3).
 - **Coevaluación**: lista de todos los estudiantes que han presentado algún examen. La administración escribe a mano el **porcentaje** de *Comportamiento* y de *Académico* (por ejemplo 80) y el sistema lo divide entre 10: puntos sobre 10 cada uno, total sobre 20.

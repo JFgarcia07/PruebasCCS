@@ -2,7 +2,7 @@
    La rúbrica de tipo reporte interpreta el total; la nota se puede ajustar a mano y el informe se descarga en PDF. */
 import { q } from '../core/api.js';
 import { sb } from '../core/config.js';
-import { buildStudents, summarize } from '../core/report-calc.js';
+import { buildStudents, INTERVIEWS_MAX, summarize } from '../core/report-calc.js';
 import { reportPDF } from '../core/report-pdf.js';
 import { go, render } from '../core/router.js';
 import { state } from '../core/state.js';
@@ -15,7 +15,8 @@ const rubricName = () => state.rep.rubrics.find(r => r.id === state.rep.rubricId
 const student = key => state.rep.students.find(s => s.key === key);
 const lvTag = l => l ? `<span class="tag ${esc(l.cls)}">${esc(l.name)}</span>` : '<span class="mut">—</span>';
 /* Puntos de una parte: «23 / 50» y, entre paréntesis, cuántos exámenes o entrevistas son */
-const partTxt = (p, count = true) => p.n ? `${p.score} / ${p.max}${count && p.n > 1 ? ` <span class="mut">(${p.n})</span>` : ''}` : '<span class="mut">—</span>';
+const partTxt = (p, count = true) => p.n || p.mode ? `${p.score} / ${p.max}${p.mode ? ' <span class="tag warn" title="Entrevistas excluidas por la administración">excl.</span>' : count && p.n > 1 ? ` <span class="mut">(${p.n})</span>` : ''}` : '<span class="mut">—</span>';
+const MODES = { zero: 'todas en cero', full: 'todas en puntaje completo' };
 const pctTxt = (a, b) => b ? Math.round(a / b * 100) + ' %' : '—';
 
 export const loaders = {
@@ -58,7 +59,7 @@ export const views = {
     <p class="mut">Se genera solo: de cada estudiante se suman <b>todos sus exámenes, sus entrevistas y su coevaluación</b>. La rúbrica de reporte (elegida arriba) dice qué nivel le corresponde. Puedes ajustar la nota a mano y descargar el informe en PDF.</p>
     <div class="stats"><div class="stat"><b>${students.length}</b><span>Estudiantes</span></div>
       <div class="stat"><b>${students.filter(s => s.coeval).length}</b><span>Con coevaluación</span></div>
-      <div class="stat"><b>${students.filter(s => s.override).length}</b><span>Notas ajustadas</span></div>
+      <div class="stat"><b>${students.filter(s => s.override?.manual_total != null).length}</b><span>Notas ajustadas</span></div>
       <div class="stat"><b>${avg === null ? '—' : avg + ' %'}</b><span>Promedio general</span></div></div>
     <input id="repq" placeholder="Buscar por nombre o correo…" autocomplete="off" style="margin-bottom:.8rem">
     <div class="card tablewrap">${students.length ? `<table><thead><tr><th>Estudiante</th><th>Exámenes</th><th>Entrevistas</th><th>Coevaluación</th><th>Total</th><th>%</th><th>Nivel</th><th></th></tr></thead>
@@ -71,6 +72,7 @@ export const views = {
     const sub = (list, span = 3, pct = 1) => { const a = Math.round(list.reduce((x, e) => x + e.score, 0) * 100) / 100, b = Math.round(list.reduce((x, e) => x + e.max, 0) * 100) / 100; return `<tr class="subtot"><td colspan="${span}"><b>Subtotal</b></td><td><b>${a} / ${b}</b></td>${pct ? `<td>${pctTxt(a, b)}</td>` : ''}</tr>`; };
     return `
     <div class="row" style="margin-bottom:1rem"><button class="ghost" data-act="repback">← Reportes</button><span class="grow"></span>
+      <button class="sec" data-act="repiv" data-key="${esc(s.key)}">Excluir entrevistas</button>
       <button class="sec" data-act="repadjust" data-key="${esc(s.key)}">✎ Ajustar nota</button>
       <button data-act="reppdf" data-key="${esc(s.key)}" ${m.empty ? 'disabled' : ''}>⬇ Descargar PDF</button></div>
     <div class="paper">
@@ -83,6 +85,8 @@ export const views = {
           ${m.empty ? '' : `<p class="mut sumtext" style="margin:0">Exámenes <b>${m.parts.exams.score} / ${m.parts.exams.max}</b> · Entrevistas <b>${m.parts.interviews.score} / ${m.parts.interviews.max}</b> · Coevaluación <b>${m.parts.coeval.score} / ${m.parts.coeval.max}</b></p>`}
           ${!m.empty && m.max !== 100 ? `<p class="sumtext" style="margin:0;color:var(--warn)">⚠ El máximo posible de este estudiante suma <b>${m.max}</b>, no 100: tiene ${m.parts.exams.n} ${m.parts.exams.n === 1 ? 'examen terminado' : 'exámenes terminados'} (${m.parts.exams.max} pts), ${m.parts.interviews.n} ${m.parts.interviews.n === 1 ? 'entrevista' : 'entrevistas'} (${m.parts.interviews.max} pts) y ${m.parts.coeval.n ? 'coevaluación (' + m.parts.coeval.max + ' pts)' : 'sin coevaluación'}. Revisa las tablas de abajo.</p>` : ''}
           ${m.level && m.level.text ? `<p class="lvltext sumtext">${esc(m.level.text)}</p>` : ''}
+          ${m.parts.interviews.mode ? `<p class="mut sumtext">✎ Entrevistas excluidas: ${MODES[m.parts.interviews.mode]} (${m.parts.interviews.score} / ${m.parts.interviews.max}).
+            <button class="sm ghost" data-act="dorepiv" data-key="${esc(s.key)}" data-mode="">Usar las entrevistas reales</button></p>` : ''}
           ${m.adjusted ? `<p class="mut sumtext">✎ Nota ajustada manualmente (suma automática: ${m.auto}).${s.override.reason ? ' Motivo: ' + esc(s.override.reason) : ''}
             <button class="sm ghost" data-act="repclear" data-key="${esc(s.key)}">Quitar ajuste</button></p>` : ''}
         </div>
@@ -92,7 +96,8 @@ export const views = {
           ${ex.map(e => `<tr><td><b>${esc(e.title)}</b>${e.edited ? ' <span class="tag warn">nota editada</span>' : ''}</td><td>${fmtD(e.date)}</td><td></td><td>${e.score} / ${e.max}</td><td>${pctTxt(e.score, e.max)}</td></tr>`).join('')}${sub(ex)}</tbody></table></div>` : '<p class="mut">Sin exámenes registrados.</p>'}
 
         <h3 class="sec-title">Entrevistas</h3>
-        ${iv.length ? `<div class="tablewrap"><table class="rep"><thead><tr><th>Rúbrica</th><th>Entrevistado / Entrevistador</th><th>Fecha</th><th>Puntos</th></tr></thead><tbody>
+        ${m.parts.interviews.mode ? `<p class="mut">Excluidas por la administración: ${MODES[m.parts.interviews.mode]}, <b>${m.parts.interviews.score} / ${m.parts.interviews.max}</b>. ${iv.length ? `(Hay ${iv.length} entrevista${iv.length === 1 ? '' : 's'} real${iv.length === 1 ? '' : 'es'} que no se cuenta${iv.length === 1 ? '' : 'n'}.)` : ''}</p>`
+        : iv.length ? `<div class="tablewrap"><table class="rep"><thead><tr><th>Rúbrica</th><th>Entrevistado / Entrevistador</th><th>Fecha</th><th>Puntos</th></tr></thead><tbody>
           ${iv.map(i => `<tr><td><b>${esc(i.rubric)}</b></td><td>${esc(i.who)}${i.interviewer ? ` <span class="mut">· ${esc(i.interviewer)}</span>` : ''}</td><td>${fmtD(i.date)}</td><td>${i.score} / ${i.max}</td></tr>`).join('')}${sub(iv, 3, 0)}</tbody></table></div>` : '<p class="mut">Sin entrevistas registradas.</p>'}
 
         <h3 class="sec-title">Coevaluación docente</h3>
@@ -138,12 +143,36 @@ export const acts = {
   dorepadjust: async el => {
     const s = student(el.dataset.key), v = $('#adjval').value.trim(), n = +v, max = +el.dataset.max;
     if (v === '' || !(n >= 0 && n <= max)) return toast(`La nota debe estar entre 0 y ${max}.`, 'err');
-    const row = await q(sb.from('report_overrides').upsert({ student_key: s.key, student_name: s.name, manual_total: n, reason: $('#adjwhy').value.trim().slice(0, 500), updated_at: new Date().toISOString() }, { onConflict: 'student_key' }).select().single());
-    s.override = row; $('.modal')?.remove(); toast('Nota ajustada', 'ok'); render('repstudent');
+    await saveOverride(s, { manual_total: n, reason: $('#adjwhy').value.trim().slice(0, 500) });
+    $('.modal')?.remove(); toast('Nota ajustada', 'ok'); render('repstudent');
   },
   repclear: async el => {
     const s = student(el.dataset.key);
     if (!await ask('¿Quitar el ajuste y volver a la suma automática?', 'Quitar')) return;
-    await q(sb.from('report_overrides').delete().eq('student_key', s.key)); s.override = null; render('repstudent');
+    await saveOverride(s, { manual_total: null, reason: '' }); render('repstudent');
+  },
+  /* Excluir las entrevistas del estudiante: se cuentan todas en cero o todas en puntaje completo */
+  repiv: el => {
+    const s = student(el.dataset.key), cur = s.override?.interview_mode || '';
+    const d = document.createElement('div'); d.className = 'modal small';
+    d.innerHTML = `<div class="card"><h3>Entrevistas de ${esc(s.name)}</h3>
+      <p class="mut">Las entrevistas valen ${INTERVIEWS_MAX} puntos en total. Si no se va a contar la entrevista real, elige cómo se califica:</p>
+      ${[['', 'Usar las entrevistas reales'], ['zero', `Todas en cero (0 / ${INTERVIEWS_MAX})`], ['full', `Todas en puntaje completo (${INTERVIEWS_MAX} / ${INTERVIEWS_MAX})`]].map(([v, n]) =>
+        `<label class="chk"><input type="radio" name="ivmode" value="${v}" ${v === cur ? 'checked' : ''}> ${esc(n)}</label>`).join('')}
+      <div class="row" style="justify-content:flex-end;margin-top:1rem"><button class="ghost" data-act="closemodal">Cancelar</button>
+      <button data-act="dorepiv" data-key="${esc(s.key)}">Guardar</button></div></div>`;
+    document.body.appendChild(d);
+  },
+  dorepiv: async el => {
+    const s = student(el.dataset.key), mode = el.dataset.mode !== undefined ? el.dataset.mode : (document.querySelector('input[name="ivmode"]:checked')?.value ?? '');
+    await saveOverride(s, { interview_mode: mode || null });
+    $('.modal')?.remove(); toast(mode ? 'Entrevistas excluidas' : 'Se usan las entrevistas reales', 'ok'); render('repstudent');
   }
 };
+
+/* Un solo registro por estudiante con el ajuste de nota y/o el modo de entrevistas; si no queda nada, se borra */
+async function saveOverride(s, patch) {
+  const o = { manual_total: s.override?.manual_total ?? null, interview_mode: s.override?.interview_mode ?? null, reason: s.override?.reason || '', ...patch };
+  if (o.manual_total === null && !o.interview_mode) { await q(sb.from('report_overrides').delete().eq('student_key', s.key)); s.override = null; return; }
+  s.override = await q(sb.from('report_overrides').upsert({ student_key: s.key, student_name: s.name, ...o, updated_at: new Date().toISOString() }, { onConflict: 'student_key' }).select().single());
+}
