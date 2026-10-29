@@ -22,7 +22,7 @@ export const loaders = {
   /* Una sola carga con columnas mínimas; los totales se calculan aquí (en el navegador) */
   async reports() {
     const [attempts, exams, interviews, rubs, evals, overrides] = await Promise.all([
-      q(sb.from('attempts').select('exam_id,student_name,email,grade,ended_at,score,max_score,score_edited_at').order('started_at', { ascending: false })),
+      q(sb.from('attempts').select('exam_id,student_name,email,ended_at,score,max_score,score_edited_at').order('started_at', { ascending: false })),
       q(sb.from('exams').select('id,title')),
       q(sb.from('interviews').select('rubric_id,subject_name,subject_type,child_name,interviewer,scores,created_at')),
       q(sb.from('rubrics').select('id,name,kind,criteria,levels').in('kind', ['interview', 'report']).order('name')),
@@ -39,7 +39,7 @@ export const loaders = {
 const rowHTML = s => {
   const m = summarize(s, levels());
   return `<tr data-find="${esc(norm(s.name + ' ' + s.email))}">
-    <td><b>${esc(s.name)}</b>${s.email ? `<br><span class="mut">${esc(s.email)}</span>` : ''}${s.grade ? `<br><span class="tag">${esc(s.grade)}</span>` : ''}</td>
+    <td><b>${esc(s.name)}</b>${s.email ? `<br><span class="mut">${esc(s.email)}</span>` : ''}</td>
     <td>${partTxt(m.parts.exams)}</td><td>${partTxt(m.parts.interviews)}</td><td>${partTxt(m.parts.coeval, false)}</td>
     <td style="white-space:nowrap">${m.empty ? '<span class="mut">—</span>' : `<b>${m.total}</b> / ${m.max}${m.adjusted ? ' <span class="tag warn" title="Nota ajustada a mano">ajustada</span>' : ''}`}</td>
     <td>${m.empty ? '' : m.pct + ' %'}</td><td>${m.empty ? '' : lvTag(m.level)}</td>
@@ -76,7 +76,7 @@ export const views = {
     <div class="paper">
       <div class="paper-head"><img src="logo-white.webp" alt="Calvary Christian School"><div><b>Calvary Christian School</b><span>Informe integral del estudiante</span></div></div>
       <div class="paper-body">
-        <div class="paper-student"><small>ESTUDIANTE</small><h2>${esc(s.name)}</h2>${s.email ? `<span class="mut">${esc(s.email)}</span>` : ''}${s.grade ? ` <span class="tag">${esc(s.grade)}</span>` : ''}</div>
+        <div class="paper-student"><small>ESTUDIANTE</small><h2>${esc(s.name)}</h2>${s.email ? `<span class="mut">${esc(s.email)}</span>` : ''}</div>
         <div class="sumbox">
           <div><small>TOTAL ACUMULADO</small><div class="sumbig">${m.empty ? '—' : `${m.total} <span>/ ${m.max}</span>`}</div>${m.empty ? '' : `<span class="mut">${m.pct} %</span>`}</div>
           <div class="sumlvl">${m.level ? `<small>NIVEL${rubricName() ? ' · ' + esc(rubricName()) : ''}</small><div>${lvTag(m.level)}</div>` : ''}</div>

@@ -11,7 +11,7 @@ export const loaders = {
   async results(examId) {
     const [exams, attempts, owners] = await Promise.all([
       q(sb.from('exams').select(EXAM_COLS).order('created_at', { ascending: false })),
-      q(sb.from('attempts').select('id,exam_id,student_name,email,grade,started_at,ended_at,score,score_auto,score_edited_at,max_score,flags').order('started_at', { ascending: false })),
+      q(sb.from('attempts').select('id,exam_id,student_name,email,started_at,ended_at,score,score_auto,score_edited_at,max_score,flags').order('started_at', { ascending: false })),
       // la administración ve los exámenes de todos y necesita saber de quién es cada uno
       isAdmin() ? q(sb.from('profiles').select('id,email')).then(r => Object.fromEntries(r.map(p => [p.id, p.email]))) : {}]);
     state.cache.exams = exams;
@@ -37,7 +37,7 @@ export const views = {
     <div class="card tablewrap">${attempts.length ? `<table><thead><tr><th>Estudiante</th><th>Examen</th>${admin ? '<th>Profesor</th>' : ''}<th>Nota</th><th>Nivel</th><th>Fecha</th><th>Alertas</th><th></th></tr></thead><tbody>
     ${attempts.map(a => {
       const ex = exams.find(e => e.id === a.exam_id);
-      return `<tr><td><b>${esc(a.student_name)}</b>${a.email ? `<br><span class="mut">${esc(a.email)}</span>` : ''}${a.grade ? `<br><span class="tag">${esc(a.grade)}</span>` : ''}</td><td>${esc(ex ? ex.title : '')}</td>${admin ? `<td>${esc(owners[ex?.owner] || '')}</td>` : ''}
+      return `<tr><td><b>${esc(a.student_name)}</b>${a.email ? `<br><span class="mut">${esc(a.email)}</span>` : ''}</td><td>${esc(ex ? ex.title : '')}</td>${admin ? `<td>${esc(owners[ex?.owner] || '')}</td>` : ''}
       <td style="white-space:nowrap">${a.ended_at ? `<b>${a.score}</b>/${a.max_score}${a.score_edited_at ? ` <span class="tag warn" title="Nota automática: ${a.score_auto}">editada</span>` : ''}${admin ? ` <button class="sm ghost" data-act="editscore" data-id="${a.id}" data-score="${a.score}" data-max="${a.max_score}" title="Modificar la nota a mano">✎</button>` : ''}` : '<span class="tag warn">en curso</span>'}</td>
       <td>${a.ended_at && a.max_score ? (l => `<span class="tag ${esc(l.cls)}">${esc(l.name)}</span>`)(levelFor(Math.round(a.score / a.max_score * 100), ex?.levels)) : '<span class="mut">—</span>'}</td><td>${fdate(a.started_at)}</td>
       <td>${a.flags.length ? `<span class="tag bad">${a.flags.length}</span>` : '<span class="mut">—</span>'}</td>
@@ -73,8 +73,8 @@ export const acts = {
   },
   csv: async el => {
     const { exams, attempts } = await loaders.results(el.dataset.id || '');
-    const rows = [['Estudiante', 'Correo', 'Grado', 'Examen', 'Nota', 'Máximo', 'Inicio', 'Fin', 'Alertas']];
-    attempts.forEach(a => rows.push([a.student_name, a.email || '', a.grade || '', exams.find(e => e.id === a.exam_id)?.title, a.score ?? '', a.max_score ?? '', fdate(a.started_at), a.ended_at ? fdate(a.ended_at) : '', a.flags.length]));
+    const rows = [['Estudiante', 'Correo', 'Examen', 'Nota', 'Máximo', 'Inicio', 'Fin', 'Alertas']];
+    attempts.forEach(a => rows.push([a.student_name, a.email || '', exams.find(e => e.id === a.exam_id)?.title, a.score ?? '', a.max_score ?? '', fdate(a.started_at), a.ended_at ? fdate(a.ended_at) : '', a.flags.length]));
     download('resultados.csv', '﻿' + rows.map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\n'), 'text/csv');
   }
 };
@@ -85,7 +85,7 @@ export async function showDetail(id) {
     q(sb.from('shots').select('taken_at,img').eq('attempt_id', id).order('taken_at'))]);
   const ex = await fullExam(a.exam_id).catch(() => null);
   const m = document.createElement('div'); m.className = 'modal';
-  m.innerHTML = `<div class="card"><div class="row"><h3 class="grow">${esc(a.student_name)}${a.email ? ' · ' + esc(a.email) : ''}${a.grade ? ' · ' + esc(a.grade) : ''} — ${esc(ex?.title || '')}</h3><button class="sm sec" data-act="closemodal">Cerrar</button></div>
+  m.innerHTML = `<div class="card"><div class="row"><h3 class="grow">${esc(a.student_name)}${a.email ? ' · ' + esc(a.email) : ''} — ${esc(ex?.title || '')}</h3><button class="sm sec" data-act="closemodal">Cerrar</button></div>
     <p>Nota: <b>${a.score ?? '—'}/${a.max_score ?? '—'}</b>${a.ended_at && a.max_score ? (p => ` (${p} %) · Nivel: <b>${esc(levelFor(p, ex?.levels).name)}</b>`)(Math.round(a.score / a.max_score * 100)) : ''} · Inicio: ${fdate(a.started_at)}${a.ended_at ? ' · Duración: ' + fmt(new Date(a.ended_at) - new Date(a.started_at)) : ''}</p>
     <h4>Alertas (${a.flags.length})</h4>${a.flags.length ? '<ul>' + a.flags.map(f => `<li>${new Date(f.t).toLocaleTimeString('es')} — ${esc(f.msg)}</li>`).join('') + '</ul>' : '<p class="mut">Sin alertas.</p>'}
     <h4>Fotos de la cámara (${shots.length})</h4><div class="shots">${shots.map(s => `<img src="${s.img}" title="${new Date(s.taken_at).toLocaleTimeString('es')}">`).join('') || '<span class="mut">Sin fotos.</span>'}</div>
