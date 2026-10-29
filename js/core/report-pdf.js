@@ -25,12 +25,33 @@ const imgPng = (src, px = 360) => new Promise(res => {
 const NAVY = [27, 38, 68], GOLD = [201, 168, 119], GRAY = [102, 112, 137], INK = [22, 33, 63], SOFT = [238, 241, 248], LINE = [214, 219, 232];
 const CLS = { ok: [21, 128, 61], warn: [180, 83, 9], bad: [185, 28, 28] };
 
-/* s: estudiante (report-calc) · sum: summarize() · rubricName: rúbrica de reporte usada (o '') */
-export async function reportPDF(s, sum, rubricName) {
+/* Documento nuevo con el logo ya cargado (se carga una sola vez aunque se dibujen muchos informes) */
+async function newDoc() {
   await loadScript(JSPDF);
   const doc = new window.jspdf.jsPDF({ unit: 'pt', format: 'letter' });
+  return { doc, logo: await imgPng('logo-white.webp', 240) };
+}
+const slugOf = name => name.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase();
+
+/* s: estudiante (report-calc) · sum: summarize() · rubricName: rúbrica de reporte usada (o '') */
+export async function reportPDF(s, sum, rubricName) {
+  const ctx = await newDoc();
+  drawReport(ctx, s, sum, rubricName);
+  ctx.doc.save(`informe-${slugOf(s.name) || 'estudiante'}.pdf`);
+}
+
+/* Todos los informes en un solo PDF: cada estudiante empieza en hoja nueva y numera sus propias páginas.
+   items: [{ s, sum }] en el orden en que deben salir */
+export async function allReportsPDF(items, rubricName) {
+  const ctx = await newDoc();
+  items.forEach(({ s, sum }, i) => { if (i) ctx.doc.addPage(); drawReport(ctx, s, sum, rubricName); });
+  ctx.doc.save('informes-estudiantes.pdf');
+}
+
+/* Dibuja el informe de un estudiante a partir de la página actual del documento */
+function drawReport({ doc, logo }, s, sum, rubricName) {
   const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 48, CW = W - 2 * M, BOTTOM = H - 62;
-  const [logo] = await Promise.all([imgPng('logo-white.webp', 240)]);
+  const firstPage = doc.getNumberOfPages();
   let y = 0;
   const font = (style, size, color) => { doc.setFont('helvetica', style); doc.setFontSize(size); doc.setTextColor(...color); };
   const text = (t, x, yy, opt) => doc.text(String(t), x, yy, opt);
@@ -121,12 +142,10 @@ export async function reportPDF(s, sum, rubricName) {
     cv ? [...cv.parts.map(p => [p.name, `${p.pct} %`, `${p.points} / ${p.outOf}`]), ['Total coevaluación', pc(cv.score, cv.max), `${cv.score} / ${cv.max}`]] : [], 'Sin coevaluación registrada.');
   if (cv && cv.comment) { const ls = wrap(cv.comment, CW - 16); need(ls.length * 12 + 34); font('bold', 9, GRAY); text('Comentario', M, y - 2); y += 10; font('normal', 9.5, INK); doc.text(ls, M + 8, y); y += ls.length * 12 + 14; }
 
-  // Pie de página en todas las hojas
-  const n = doc.getNumberOfPages();
-  for (let p = 1; p <= n; p++) {
+  // Pie de página en las hojas de este informe
+  const lastPage = doc.getNumberOfPages(), n = lastPage - firstPage + 1;
+  for (let p = firstPage; p <= lastPage; p++) {
     doc.setPage(p); doc.setDrawColor(...LINE); doc.setLineWidth(.6); doc.line(M, H - 44, W - M, H - 44);
-    font('normal', 8.5, GRAY); text('Calvary Christian School · Informe del estudiante · Documento confidencial', M, H - 30); text(`Página ${p} de ${n}`, W - M, H - 30, { align: 'right' });
+    font('normal', 8.5, GRAY); text('Calvary Christian School · Informe del estudiante · Documento confidencial', M, H - 30); text(`Página ${p - firstPage + 1} de ${n}`, W - M, H - 30, { align: 'right' });
   }
-  const slug = s.name.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase();
-  doc.save(`informe-${slug || 'estudiante'}.pdf`);
 }
