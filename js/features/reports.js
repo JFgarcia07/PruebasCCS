@@ -16,7 +16,7 @@ const rubricName = () => state.rep.rubrics.find(r => r.id === state.rep.rubricId
 const student = key => state.rep.students.find(s => s.key === key);
 const lvTag = l => l ? `<span class="tag ${esc(l.cls)}">${esc(l.name)}</span>` : '<span class="mut">—</span>';
 /* Puntos de una parte: «23 / 50» y, entre paréntesis, cuántos exámenes o entrevistas son */
-const partTxt = (p, count = true) => p.n || p.excluded ? `${p.score} / ${p.max}${p.excluded ? ' <span class="tag warn" title="Hay entrevistas excluidas por la administración">excl.</span>' : count && p.n > 1 ? ` <span class="mut">(${p.n})</span>` : ''}` : '<span class="mut">—</span>';
+const partTxt = (p, count = true) => p.n || p.excluded ? `${p.max || !p.excluded ? `${p.score} / ${p.max}` : 'no cuenta'}${p.excluded ? ' <span class="tag warn" title="Hay entrevistas excluidas por la administración">excl.</span>' : count && p.n > 1 ? ` <span class="mut">(${p.n})</span>` : ''}` : '<span class="mut">—</span>';
 /* «a padres (en cero), al estudiante (no se toma en cuenta)» */
 const exclList = p => p.rows.filter(r => r.mode).map(r => `${r.type === 'padre' ? 'a padres' : 'al estudiante'} (${INTERVIEW_MODES[r.mode]})`).join(', ');
 const pctTxt = (a, b) => b ? Math.round(a / b * 100) + ' %' : '—';
@@ -85,7 +85,8 @@ export const views = {
         <div class="sumbox">
           <div><small>TOTAL ACUMULADO</small><div class="sumbig">${m.empty ? '—' : `${m.total} <span>/ ${m.max}</span>`}</div>${m.empty ? '' : `<span class="mut">${m.pct} %</span>`}</div>
           <div class="sumlvl">${m.level ? `<small>NIVEL${rubricName() ? ' · ' + esc(rubricName()) : ''}</small><div>${lvTag(m.level)}</div>` : ''}</div>
-          ${m.empty ? '' : `<p class="mut sumtext" style="margin:0">Exámenes <b>${m.parts.exams.score} / ${m.parts.exams.max}</b> · Entrevistas <b>${m.parts.interviews.score} / ${m.parts.interviews.max}</b> · Coevaluación <b>${m.parts.coeval.score} / ${m.parts.coeval.max}</b></p>`}
+          ${m.empty ? '' : `<p class="mut sumtext" style="margin:0">Exámenes <b>${m.parts.exams.score} / ${m.parts.exams.max}</b> · Entrevistas <b>${m.parts.interviews.max ? m.parts.interviews.score + ' / ' + m.parts.interviews.max : 'no se toman en cuenta'}</b> · Coevaluación <b>${m.parts.coeval.score} / ${m.parts.coeval.max}</b></p>`}
+          ${m.scaled ? `<p class="mut sumtext" style="margin:0">Las entrevistas no se toman en cuenta: el total se calcula con lo que sí cuenta (<b>${m.scaled.score} / ${m.scaled.max}</b>) y se lleva a 100.</p>` : ''}
           ${!m.empty && m.max !== 100 && !Object.values(m.parts.interviews.modes).includes('skip') ? `<p class="sumtext" style="margin:0;color:var(--warn)">⚠ El máximo posible de este estudiante suma <b>${m.max}</b>, no 100: tiene ${m.parts.exams.n} ${m.parts.exams.n === 1 ? 'examen terminado' : 'exámenes terminados'} (${m.parts.exams.max} pts), ${m.parts.interviews.n} ${m.parts.interviews.n === 1 ? 'entrevista' : 'entrevistas'} (${m.parts.interviews.max} pts) y ${m.parts.coeval.n ? 'coevaluación (' + m.parts.coeval.max + ' pts)' : 'sin coevaluación'}. Revisa las tablas de abajo.</p>` : ''}
           ${m.level && m.level.text ? `<p class="lvltext sumtext">${esc(m.level.text)}</p>` : ''}
           ${m.parts.interviews.excluded ? `<p class="mut sumtext">✎ Entrevistas excluidas: ${exclList(m.parts.interviews)}.

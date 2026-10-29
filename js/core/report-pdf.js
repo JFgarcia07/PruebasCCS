@@ -57,7 +57,8 @@ export async function reportPDF(s, sum, rubricName) {
   // Resumen: total acumulado y rango de la rúbrica de reporte
   const lv = sum.level, color = lv ? (CLS[lv.cls] || NAVY) : GRAY;
   const lines = lv && lv.text ? wrap(lv.text, CW - 36) : [];
-  const adj = sum.adjusted ? wrap(`Nota ajustada manualmente por la administración (suma automática: ${sum.auto}).` + (s.override.reason ? ' Motivo: ' + s.override.reason : ''), CW - 36, 9) : [];
+  const adj = [...(sum.scaled ? wrap(`Las entrevistas no se tomaron en cuenta: el total se calculó con lo que sí cuenta (${sum.scaled.score} / ${sum.scaled.max}) y se llevó a 100.`, CW - 36, 9) : []),
+    ...(sum.adjusted ? wrap(`Nota ajustada manualmente por la administración (suma automática: ${sum.auto}).` + (s.override.reason ? ' Motivo: ' + s.override.reason : ''), CW - 36, 9) : [])];
   const bh = 82 + (lines.length ? lines.length * 13 + 8 : 0) + (adj.length ? adj.length * 12 + 10 : 0);
   need(bh + 10);
   doc.setFillColor(...SOFT); doc.roundedRect(M, y, CW, bh, 6, 6, 'F');

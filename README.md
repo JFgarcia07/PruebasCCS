@@ -22,7 +22,7 @@ Frontend estático (HTML/CSS/JS) + Supabase (Auth, Postgres con RLS, funciones R
 ## Reportes de estudiante (automáticos, solo administración)
 - Menú **Reportes**: de cada estudiante se suman **todos sus exámenes, sus entrevistas y su coevaluación**. El total (puntos y %) se interpreta con la **rúbrica de tipo reporte** que elijas arriba (o la escala predeterminada).
 - Las entrevistas se asignan al estudiante por su nombre (alumno entrevistado, o hijo/a de un padre entrevistado). Los exámenes y la coevaluación, por su correo.
-- En el informe de cada estudiante, **Excluir entrevistas** permite elegir qué hacer con cada entrevista (a padres / al estudiante): usarla real, excluirla **en cero**, excluirla **con puntaje completo** (ambas siguen sumando sus 15 puntos al máximo) o **no tomarla en cuenta** (se quita del reporte).
+- En el informe de cada estudiante, **Excluir entrevistas** permite elegir qué hacer con cada entrevista (a padres / al estudiante): usarla real, excluirla **en cero**, excluirla **con puntaje completo** (ambas siguen sumando sus 15 puntos al máximo) o **no tomarla en cuenta** (se quita del reporte y el total se lleva a 100: por ejemplo, 50 de 70 de lo que sí cuenta se muestra como 71.43 de 100).
 - **Cambiar correo**: el correo identifica al estudiante; se actualiza en todos sus exámenes, su coevaluación y su ajuste de nota.
 - La administración puede **ajustar la nota a mano** (queda marcada como ajustada, con motivo) y **descargar el informe en PDF**.
 

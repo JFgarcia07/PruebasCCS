@@ -63,8 +63,11 @@ export function summarize(s, levels) {
   const iv = interviewPart(s);
   const parts = { exams: part(s.exams), interviews: iv, coeval: part(s.coeval ? [s.coeval] : []) };
   const items = [...s.exams, ...iv.rows.filter(x => x.mode !== 'skip'), ...(s.coeval ? [s.coeval] : [])];
-  const auto = r2(items.reduce((a, x) => a + x.score, 0)), max = r2(items.reduce((a, x) => a + x.max, 0));
+  const rawScore = r2(items.reduce((a, x) => a + x.score, 0)), rawMax = r2(items.reduce((a, x) => a + x.max, 0));
+  // Si alguna entrevista «no se toma en cuenta», el máximo baja de 100: el total se calcula con lo que sí cuenta y se lleva a 100
+  const scaled = iv.rows.some(x => x.mode === 'skip') && rawMax > 0 && rawMax !== 100;
+  const auto = scaled ? r2(rawScore / rawMax * 100) : rawScore, max = scaled ? 100 : rawMax;
   const adjusted = s.override?.manual_total != null, total = adjusted ? +s.override.manual_total : auto;
   const pct = max ? Math.round(total / max * 100) : 0;
-  return { parts, auto, max, total, pct, adjusted, level: max ? levelFor(pct, levels) : null, empty: !items.length };
+  return { parts, auto, max, total, pct, adjusted, scaled: scaled ? { score: rawScore, max: rawMax } : null, level: max ? levelFor(pct, levels) : null, empty: !items.length };
 }
