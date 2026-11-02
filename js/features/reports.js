@@ -24,13 +24,15 @@ const pctTxt = (a, b) => b ? Math.round(a / b * 100) + ' %' : '—';
 export const loaders = {
   /* Una sola carga con columnas mínimas; los totales se calculan aquí (en el navegador) */
   async reports() {
-    const [attempts, exams, interviews, rubs, evals, overrides] = await Promise.all([
+    let [attempts, exams, interviews, rubs, evals, overrides] = await Promise.all([
       q(sb.from('attempts').select('exam_id,student_name,email,ended_at,score,max_score,score_edited_at').order('started_at', { ascending: false })),
-      q(sb.from('exams').select('id,title')),
+      q(sb.from('exams').select('id,title,admission')),
       q(sb.from('interviews').select('subject_name,subject_type,child_name,interviewer,scores,held_on,created_at')),
       q(sb.from('rubrics').select('id,name,kind,levels').eq('kind', 'report').order('name')),
       q(sb.from('coevaluations').select('student_key,scores,comment,updated_at')),
       q(sb.from('report_overrides').select('*'))]);
+    const adm = new Set(exams.filter(e => e.admission).map(e => e.id));   // solo las pruebas de admisión cuentan en los reportes
+    attempts = attempts.filter(a => adm.has(a.exam_id)); exams = exams.filter(e => adm.has(e.id));
     const reportRubrics = rubs.filter(r => r.kind === 'report');
     let saved = ''; try { saved = localStorage.getItem('rep:rubric') || ''; } catch { }
     state.rep = { students: buildStudents({ attempts, exams, interviews, evals, overrides }),

@@ -30,7 +30,7 @@ export const views = {
     ${exams.length ? exams.map(e => `<div class="card ex-card"><div class="grow"><h3 style="margin-bottom:.2rem">${esc(e.title)}</h3>
         <div class="tags"><span class="tag">Código <span class="code">${esc(e.code)}</span></span>
         <span class="tag">⏱ ${e.minutes} min</span><span class="tag">${e.n_questions} preguntas</span><span class="tag ok" title="Lo que vale el examen: suma de los puntos de sus preguntas">${e.total_points} pts</span>
-        ${e.camera ? '<span class="tag warn">📷 cámara</span>' : ''}<span class="tag ok">${counts[e.id] || 0} intentos</span></div></div>
+        ${e.admission ? '<span class="tag" title="La administración ve sus resultados y se suman a los reportes">🎓 Admisión</span>' : ''}${e.camera ? '<span class="tag warn">📷 cámara</span>' : ''}<span class="tag ok">${counts[e.id] || 0} intentos</span></div></div>
         <div class="row"><button class="sm sec" data-act="copylink" data-code="${esc(e.code)}">🔗 Copiar enlace</button>
         <button class="sm" data-act="edit" data-id="${e.id}">Editar</button>
         <button class="sm sec" data-act="results" data-id="${e.id}">Resultados</button>
@@ -46,6 +46,7 @@ export const views = {
       <div><label>Título</label><input data-e="title" value="${esc(e.title)}" placeholder="Ej. Parcial de Matemática"></div>
       <div><label>Código de acceso</label><input data-e="code" value="${esc(e.code)}"></div>
       <div><label>Duración (minutos)</label><input data-e="minutes" type="number" min="1" value="${e.minutes}"></div></div>
+      <label class="chk"><input type="checkbox" data-e="admission" ${e.admission ? 'checked' : ''}> Es prueba de admisión (la administración ve sus resultados y se suman a los reportes; si no, solo la ves tú)</label>
       <label class="chk"><input type="checkbox" data-e="camera" ${e.camera ? 'checked' : ''}> Exigir cámara (fotos periódicas y registro de salidas de la pestaña)</label>
       <label class="chk"><input type="checkbox" data-e="shuffle" ${e.shuffle ? 'checked' : ''}> Mezclar el orden de las preguntas</label>
       <label class="chk"><input type="checkbox" data-e="show_score" ${e.show_score ? 'checked' : ''}> Mostrar la nota al estudiante al terminar</label>
@@ -68,7 +69,7 @@ export const views = {
 export const acts = {
   teacher: () => go('teacher'),
   newexam: () => {
-    state.ed = { _new: true, title: '', code: Math.random().toString(36).slice(2, 7).toUpperCase(), minutes: 30, camera: true, shuffle: false, show_score: true, questions: [] };
+    state.ed = { _new: true, title: '', code: Math.random().toString(36).slice(2, 7).toUpperCase(), minutes: 30, admission: false, camera: true, shuffle: false, show_score: true, questions: [] };
     go('editor');
   },
   edit: async el => { state.ed = await fullExam(el.dataset.id); go('editor'); },
@@ -132,7 +133,7 @@ export const acts = {
       if (x.audio && !/^(data:audio\/|https:\/\/)/i.test(x.audio)) return toast(`El audio de la pregunta ${i + 1} debe ser un archivo o un enlace https://.`, 'err');
       if (!x.audio) { delete x.audio; delete x.plays; }
     }
-    const row = { title: state.ed.title.trim(), code: state.ed.code, minutes: state.ed.minutes, camera: state.ed.camera, shuffle: state.ed.shuffle, show_score: state.ed.show_score, questions: state.ed.questions,
+    const row = { title: state.ed.title.trim(), code: state.ed.code, minutes: state.ed.minutes, admission: !!state.ed.admission, camera: state.ed.camera, shuffle: state.ed.shuffle, show_score: state.ed.show_score, questions: state.ed.questions,
       rubric_id: state.ed.rubric_id || null, levels: state.cache.rubrics.find(r => r.id === state.ed.rubric_id)?.levels || null };
     try {
       await q(state.ed._new ? sb.from('exams').insert(row) : sb.from('exams').update(row).eq('id', state.ed.id));
@@ -181,7 +182,7 @@ export async function onImportFile(t) {
       const x = JSON.parse(await t.files[0].text());
       for (const ex of Array.isArray(x) ? x : [x]) {
         if (!ex.questions || !ex.title) throw new Error('Archivo JSON no válido.');
-        const row = { title: ex.title, code: String(ex.code || uid()).toUpperCase(), minutes: ex.minutes || 30, camera: !!ex.camera, shuffle: !!ex.shuffle, show_score: ex.show_score !== false, questions: ex.questions, ...(ex.levels ? { levels: ex.levels } : {}) };
+        const row = { title: ex.title, code: String(ex.code || uid()).toUpperCase(), minutes: ex.minutes || 30, admission: !!ex.admission, camera: !!ex.camera, shuffle: !!ex.shuffle, show_score: ex.show_score !== false, questions: ex.questions, ...(ex.levels ? { levels: ex.levels } : {}) };
         for (let i = 0; ; i++) {
           const { error } = await sb.from('exams').insert(i ? { ...row, code: row.code + i } : row);
           if (!error) break; if (error.code !== '23505' || i > 20) throw error;

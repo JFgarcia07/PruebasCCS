@@ -59,3 +59,7 @@ Módulos ES nativos: no hay paso de compilación; Live Server, Netlify o Cloudfl
 ## Entrevistas y coevaluación (solo administración)
 - **Entrevistas**: proceso de admisión, con las dos rúbricas fijas (5 criterios de 0 a 3 puntos, total 15). La administración abre una entrevista nueva (al estudiante o a padres), llena los datos (entrevistado, estudiante, grado, edad, encargado o correo, fecha, entrevistador), marca el nivel de cada criterio y el total se calcula solo. El grado se elige de una lista (7th a 11th) y se pueden anotar padre, madre y encargado (hasta 3).
 - **Coevaluación**: lista de todos los estudiantes que han presentado algún examen. La administración escribe a mano el **porcentaje** de *Comportamiento* y de *Académico* (por ejemplo 80) y el sistema lo divide entre 10: puntos sobre 10 cada uno, total sobre 20.
+
+## Prueba de admisión vs. examen del maestro
+- Al crear o editar un examen hay una casilla **Es prueba de admisión**. Marcada: la administración ve sus resultados y cuenta en **Reportes** y **Coevaluación** (todo funciona como siempre). Sin marcar: es un examen propio del maestro y **solo él lo ve** (el servidor lo impide a la administración con RLS).
+- Los exámenes que ya existían quedan como admisión; los nuevos nacen sin marcar. **Vuelve a ejecutar `supabase/schema.sql`** para aplicar el cambio.

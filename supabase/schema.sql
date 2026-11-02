@@ -719,5 +719,45 @@ revoke all on function public.admin_change_student_email(text, text) from public
 grant execute on function public.admin_change_student_email(text, text) to authenticated;
 
 
+-- =====================================================================
+-- PRUEBA DE ADMISIÓN vs. EXAMEN DEL MAESTRO
+-- admission = true  -> la administración ve sus resultados y cuenta en Reportes y Coevaluación.
+-- admission = false -> examen propio del maestro: solo él lo ve (la administración no).
+-- Los exámenes que ya existían quedan como admisión (así funcionaban hasta ahora); el maestro puede
+-- desmarcarlos al editarlos. Ejecutar esta sección es seguro aunque ya hayas corrido lo anterior.
+-- =====================================================================
+alter table public.exams add column if not exists admission boolean not null default true;
+
+drop policy if exists exams_select on public.exams;
+create policy exams_select on public.exams for select to authenticated
+  using (owner = auth.uid() or (admission and public.is_admin()));
+
+drop policy if exists attempts_owner_select on public.attempts;
+create policy attempts_owner_select on public.attempts for select to authenticated
+  using (exists (select 1 from public.exams e where e.id = exam_id and (e.owner = auth.uid() or (e.admission and public.is_admin()))));
+
+drop policy if exists shots_owner_select on public.shots;
+create policy shots_owner_select on public.shots for select to authenticated
+  using (exists (select 1 from public.attempts a join public.exams e on e.id = a.exam_id
+                 where a.id = attempt_id and (e.owner = auth.uid() or (e.admission and public.is_admin()))));
+
+-- Solo se pueden corregir a mano las notas de pruebas de admisión.
+create or replace function public.admin_set_score(p_attempt uuid, p_score numeric) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare a public.attempts;
+begin
+  if not public.is_admin() then raise exception 'Solo la administración puede modificar notas'; end if;
+  select * into a from public.attempts where id = p_attempt
+    and exam_id in (select id from public.exams where admission or owner = auth.uid());
+  if not found then raise exception 'Intento no encontrado'; end if;
+  if a.ended_at is null then raise exception 'El examen sigue en curso'; end if;
+  if p_score is null or p_score < 0 or p_score > coalesce(a.max_score, 0) then
+    raise exception 'La nota debe estar entre 0 y %', coalesce(a.max_score, 0);
+  end if;
+  update public.attempts set score_auto = coalesce(score_auto, score), score = p_score,
+         score_edited_by = auth.uid(), score_edited_at = now() where id = a.id;
+  return jsonb_build_object('score', p_score);
+end $$;
+
 -- Refresca la cache de la API (PostgREST) para que vea las funciones nuevas o cambiadas al terminar.
 notify pgrst, 'reload schema';

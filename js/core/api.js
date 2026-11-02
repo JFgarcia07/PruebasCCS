@@ -15,5 +15,5 @@ export async function rpc(fn, args, tries = /^student_(save|flag|shot)$/.test(fn
   }
 }
 
-export const EXAM_COLS = 'id,owner,title,code,minutes,camera,shuffle,show_score,rubric_id,levels,created_at,n_questions,total_points'; // sin 'questions': con audios incrustados pesa MB
+export const EXAM_COLS = 'id,owner,title,code,minutes,camera,shuffle,show_score,rubric_id,levels,created_at,n_questions,total_points,admission'; // sin 'questions': con audios incrustados pesa MB
 export const fullExam = id => q(sb.from('exams').select('*').eq('id', id).single());
